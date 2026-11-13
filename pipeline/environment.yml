@@ -1,0 +1,13 @@
+# Lingkungan olah InSAR PANTAU AMBLES.
+# Buat dengan: micromamba create -y -n insar -f pipeline/environment.yml
+name: insar
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - mintpy
+  - hyp3_sdk
+  - asf_search
+  - rasterio
+  - rasterstats
+  - geopandas

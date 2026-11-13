@@ -25,7 +25,7 @@ const BAGIAN = [
   ['ganti-data', 'Unggah data'],
 ] as const
 
-type StatusPil = 'Selesai' | 'Dipakai' | 'Sudah di demo' | 'Rencana' | 'Perlu dicek' | 'Tidak tercatat'
+type StatusPil = 'Selesai' | 'Dipakai' | 'Sudah di demo' | 'Rencana' | 'Lisensi belum jelas' | 'Tidak tersedia terbuka' | 'Tidak tercatat'
 
 /** Catatan proses hanya dipercaya bila dataset memang ditandai hasil olahan. */
 const prosesOlahan = (meta: DatasetMeta | null) => (meta?.jenis === 'olahan' ? meta.proses : undefined)
@@ -84,9 +84,10 @@ function susunSumber(meta: DatasetMeta | null): [string, string, StatusPil][] {
     ['Sentinel-1 lewat ASF HyP3', 'Laju penurunan', p ? 'Dipakai' : 'Rencana'],
     ['GNSS CORS Pantura (Susilo dkk. 2023)', 'Titik ikat dan validasi', p?.validasi?.gnss?.length ? 'Dipakai' : 'Rencana'],
     ['DEM Copernicus GLO-30', 'Konteks elevasi', lapis('elevasi', 'Rencana')],
-    ['Genangan rob dan pasang surut', 'Konteks rob', lapis('rob', 'Perlu dicek')],
-    ['Tata ruang (GISTARU)', 'Konteks kawasan', lapis('tata-ruang', 'Perlu dicek')],
-    ['Peta geologi 1:100.000', 'Penjelasan penyebab', lapis('geologi', 'Perlu dicek')],
+    // Tiga baris berikut: hasil cek layanan publik pada 13 November 2026 (lihat catatan di bawah tabel).
+    ['Bahaya banjir dan abrasi (InaRISK BNPB)', 'Konteks rob', lapis('rob', 'Lisensi belum jelas')],
+    ['Tata ruang (GISTARU)', 'Konteks kawasan', lapis('tata-ruang', 'Tidak tersedia terbuka')],
+    ['Peta geologi 1:100.000', 'Penjelasan penyebab', lapis('geologi', 'Tidak tersedia terbuka')],
   ]
 }
 
@@ -104,7 +105,7 @@ function Pil({ teks }: { teks: string }) {
         'inline-flex h-6 shrink-0 items-center rounded-full border px-2.5 text-[11.5px] font-semibold',
         teks === 'Dipakai' || teks === 'Sudah di demo' || teks === 'Selesai'
           ? 'border-transparent bg-ink text-surface'
-          : teks === 'Perlu dicek'
+          : teks === 'Lisensi belum jelas'
             ? 'border-notice-line bg-notice-bg text-notice-ink'
             : 'border-line-2 text-ink-2',
       )}
@@ -535,6 +536,10 @@ export default function MethodView() {
               </tbody>
             </table>
           </div>
+          <p className="text-[13px]">
+            Tiga sumber konteks terakhir dicek pada 13 November 2026 dan belum dipakai. Layanan peta InaRISK BNPB bisa diakses publik, tetapi tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis genangan rob
+            khusus. Layanan data tata ruang GISTARU meminta token akses. Peta geologi hanya tersedia lewat penampil web. Untuk rob dan tata ruang, tanyakan langsung ke dinas terkait.
+          </p>
           <p className="text-[13px]">Batas wilayah © OpenStreetMap contributors (ODbL). Peta dasar OpenFreeMap © OpenMapTiles, data OpenStreetMap.</p>
         </Bagian>
 
