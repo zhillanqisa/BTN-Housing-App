@@ -1,5 +1,6 @@
 // Tipe data inti PANTAU AMBLES.
-// Satu unit laporan = satu "kawasan" (kelurahan). Data bersifat kawasan, bukan per bangunan.
+// Laporan dibaca per titik dari grid piksel (blok sekitar 240 m). Kelurahan ("kawasan")
+// dipakai untuk nama lokasi, ringkasan Dashboard, dan data unggahan tanpa grid.
 
 export type Kategori = 'rendah' | 'sedang' | 'tinggi' | 'tidak-memadai'
 export type Tenor = 10 | 15 | 20
@@ -32,6 +33,11 @@ export interface KawasanProps {
   deret: [number, number][]
   /** Perkiraan jarak ke batas utara kota (km). Hanya masukan model demo. */
   jarakPantaiKm: number | null
+  /** Rentang laju piksel di dalam unit [bawah, atas], cm/tahun.
+   *  Kelurahan: persentil 10 dan 90. Blok titik: nilai terkecil dan terbesar. */
+  sebaran?: [number, number] | null
+  /** Elevasi median dari DEM (meter). Akurasi DEM global hanya beberapa meter. */
+  elevasiM?: number | null
 }
 
 export interface KawasanFeature {
@@ -46,9 +52,39 @@ export interface SumberData {
   catatan?: string
 }
 
+export interface LintasanProses {
+  arah: 'ascending' | 'descending'
+  path: number
+  nCitra: number
+  nPasangan: number
+}
+
+/** Hasil validasi. Laju dalam cm/tahun, positif = turun. */
+export interface ValidasiProses {
+  /** Selisih laju vertikal dari dua lintasan satelit independen pada piksel yang sama. */
+  antarLintasan?: { n: number; rmse: number; bias: number; r: number }
+  /** Laju InSAR di lokasi stasiun GNSS dibanding laju GNSS. */
+  gnss?: { stasiun: string; gnss: number; insar: number }[]
+  lulus: boolean
+  catatan?: string
+}
+
+/** Catatan proses olah InSAR. Diisi pipeline; tidak ada pada data demo. */
+export interface ProsesMeta {
+  lintasan: LintasanProses[]
+  resolusiM: number
+  referensi: string
+  koreksiAtmosfer: string
+  vertikal: 'dua-lintasan' | 'satu-lintasan'
+  validasi?: ValidasiProses
+  /** Lapis konteks yang benar-benar dipakai, mis. ['elevasi']. */
+  konteks?: string[]
+}
+
 export interface DatasetMeta {
   /** demo = ilustratif; olahan = hasil olah tim; unggahan = file yang diunggah pengguna */
   jenis: 'demo' | 'olahan' | 'unggahan'
+  proses?: ProsesMeta
   judul: string
   wilayah: string
   /** ['YYYY-MM', 'YYYY-MM'] */
@@ -96,6 +132,12 @@ export interface Selection {
   kawasanId: string | null
   label: string
   asal: AsalPilihan
+}
+
+/** Lokasi di daftar banding. */
+export interface TitikBanding {
+  lngLat: Position
+  label: string
 }
 
 export type Tema = 'light' | 'dark'

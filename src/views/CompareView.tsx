@@ -1,29 +1,39 @@
-// Halaman "Bandingkan lokasi": sampai MAKS_BANDING kawasan berdampingan.
+// Halaman "Bandingkan lokasi": sampai MAKS_BANDING titik berdampingan.
+// Dengan grid, tiap lokasi dibaca dari blok piksel di sekitar titiknya; tanpa grid, rata-rata kelurahan.
 import { useMemo } from 'react'
 import { MapTrifold, Trash } from '@phosphor-icons/react'
 import { MAKS_BANDING, TENORS } from '../lib/config'
 import { fmt } from '../lib/format'
+import { lebarBlokM } from '../lib/grid'
+import { bacaLokasi, kunciTitik, type Bacaan } from '../lib/lokasi'
 import { hitungProyeksi, kalimatStatus, klasifikasi, teksLaju, teksProyeksi } from '../lib/risk'
 import { navigasi } from '../lib/router'
 import { useApp } from '../lib/store'
-import type { Kawasan, Proyeksi } from '../lib/types'
+import type { Kawasan, Proyeksi, TitikBanding } from '../lib/types'
 import { Button, Card, Chip, cx, JudulBagian, KategoriBadge, Notice, Segmented, Skeleton } from '../ui/primitives'
 
 const CONTOH = ['Panggung Lor', 'Tlogosari Kulon', 'Tembalang']
+
+interface Baris {
+  kunci: string
+  t: TitikBanding
+  b: Bacaan
+  p: Proyeksi | null
+}
 
 function skalaRapi(maks: number): number {
   for (const s of [20, 40, 60, 80, 100, 150, 200, 250, 300, 400, 500]) if (maks <= s) return s
   return Math.ceil(maks / 100) * 100
 }
 
-function GrafikRentang({ baris, tenor }: { baris: { k: Kawasan; p: Proyeksi | null }[]; tenor: number }) {
+function GrafikRentang({ baris, tenor }: { baris: Baris[]; tenor: number }) {
   const maks = skalaRapi(Math.max(20, ...baris.map((b) => b.p?.atas ?? 0)))
   const kiri = 172
   const kanan = 548
   const x = (cm: number) => kiri + (cm / maks) * (kanan - kiri)
   const tinggi = baris.length * 40 + 30
   return (
-    <svg viewBox={`0 0 640 ${tinggi}`} className="block w-full" role="img" aria-label={`Rentang proyeksi penurunan selama ${tenor} tahun untuk ${baris.length} kawasan, dalam cm`}>
+    <svg viewBox={`0 0 640 ${tinggi}`} className="block w-full" role="img" aria-label={`Rentang proyeksi penurunan selama ${tenor} tahun untuk ${baris.length} lokasi, dalam cm`}>
       <defs>
         <pattern id="arsir-banding" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="6" height="6" fill="var(--nodata)" />
@@ -41,13 +51,14 @@ function GrafikRentang({ baris, tenor }: { baris: { k: Kawasan; p: Proyeksi | nu
       <text x={kanan + 10} y={tinggi - 6} fontSize={11} fill="var(--ink-3)">
         cm
       </text>
-      {baris.map(({ k, p }, i) => {
+      {baris.map(({ kunci, t, p }, i) => {
         const y = 12 + i * 40
+        const nama = t.label
         return (
-          <g key={k.id} tabIndex={0} className="outline-offset-2" aria-label={p ? `${k.nama}: ${teksProyeksi(p)}, nilai tengah ${fmt(p.tengah)} cm` : `${k.nama}: data tidak memadai`}>
-            <title>{p ? `${k.nama}: bawah ${fmt(p.bawah)} cm, tengah ${fmt(p.tengah)} cm, atas ${fmt(p.atas)} cm` : `${k.nama}: data tidak memadai`}</title>
+          <g key={kunci} tabIndex={0} className="outline-offset-2" aria-label={p ? `${nama}: ${teksProyeksi(p)}, nilai tengah ${fmt(p.tengah)} cm` : `${nama}: data tidak memadai`}>
+            <title>{p ? `${nama}: bawah ${fmt(p.bawah)} cm, tengah ${fmt(p.tengah)} cm, atas ${fmt(p.atas)} cm` : `${nama}: data tidak memadai`}</title>
             <text x={kiri - 12} y={y + 12} textAnchor="end" fontSize={13} fontWeight={600} fill="var(--ink)">
-              {k.nama.length > 20 ? `${k.nama.slice(0, 19)}...` : k.nama}
+              {nama.length > 20 ? `${nama.slice(0, 19)}...` : nama}
             </text>
             {p ? (
               <>
@@ -75,19 +86,29 @@ function GrafikRentang({ baris, tenor }: { baris: { k: Kawasan; p: Proyeksi | nu
 export default function CompareView() {
   const status = useApp((s) => s.status)
   const kawasan = useApp((s) => s.kawasan)
+  const grid = useApp((s) => s.grid)
+  const versiGrid = useApp((s) => s.versiGrid)
   const banding = useApp((s) => s.banding)
   const tenor = useApp((s) => s.tenor)
   const setTenor = useApp((s) => s.setTenor)
   const thresholds = useApp((s) => s.thresholds)
   const toggleBanding = useApp((s) => s.toggleBanding)
   const kosongkan = useApp((s) => s.kosongkanBanding)
-  const pilihKawasan = useApp((s) => s.pilihKawasan)
+  const pilihTitik = useApp((s) => s.pilihTitik)
   const jenis = useApp((s) => s.meta?.jenis)
 
-  const dipilih = useMemo(() => banding.map((id) => kawasan.find((k) => k.id === id)).filter((k): k is Kawasan => !!k), [banding, kawasan])
-  const baris = useMemo(
-    () => dipilih.map((k) => ({ k, p: k.memadai && k.laju != null ? hitungProyeksi(k.laju, k.sigma ?? 0, tenor) : null })),
-    [dipilih, tenor],
+  const titik = !!grid
+  const baris = useMemo<Baris[]>(
+    () =>
+      banding.flatMap((t) => {
+        const b = bacaLokasi(t.lngLat, kawasan, grid)
+        if (!b) return []
+        const k = b.data
+        return [{ kunci: kunciTitik(t.lngLat), t, b, p: k.memadai && k.laju != null ? hitungProyeksi(k.laju, k.sigma ?? 0, tenor) : null }]
+      }),
+    // versiGrid: deret dan grid bisa berganti tanpa mengubah identitas daftar kawasan
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [banding, kawasan, grid, versiGrid, tenor],
   )
   const perKecamatan = useMemo(() => {
     const m = new Map<string, Kawasan[]>()
@@ -96,18 +117,25 @@ export default function CompareView() {
   }, [kawasan])
 
   const penuh = banding.length >= MAKS_BANDING
+  const terpakai = new Set(banding.map((t) => kunciTitik(t.lngLat)))
   const berdata = baris.filter((b) => b.p).sort((a, b) => a.p!.tengah - b.p!.tengah)
   const terendah = berdata[0]
   const tertinggi = berdata[berdata.length - 1]
-  const bukaDiPeta = (id: string) => {
-    pilihKawasan(id, 'banding')
+  // dari daftar kelurahan: dengan grid yang dibaca adalah blok piksel di pusat kelurahan
+  const titikKelurahan = (k: Kawasan): TitikBanding => ({ lngLat: k.pusat, label: titik ? `Pusat Kelurahan ${k.nama}` : `Kelurahan ${k.nama}` })
+  const tambahKelurahan = (id: string) => {
+    const k = kawasan.find((x) => x.id === id)
+    if (k) toggleBanding(titikKelurahan(k))
+  }
+  const bukaDiPeta = (t: TitikBanding) => {
+    pilihTitik(t.lngLat, 'banding', t.label)
     navigasi('peta')
   }
 
   return (
     <div className="mx-auto w-full max-w-[1240px] px-4 pb-20 pt-2 md:px-8">
       <h1 className="text-[28px] font-bold tracking-tight text-ink md:text-[34px]">Bandingkan lokasi</h1>
-      <p className="mt-1 max-w-[65ch] text-[15px] text-ink-2">Lihat laju dan Proyeksi Tenor beberapa kawasan berdampingan.</p>
+      <p className="mt-1 max-w-[65ch] text-[15px] text-ink-2">Lihat laju dan Proyeksi Tenor beberapa lokasi berdampingan.</p>
       {jenis === 'demo' && (
         <Notice nada="demo" className="mt-4 max-w-[720px]">
           <strong>Data demo ilustratif.</strong> Angka di halaman ini belum berasal dari pengukuran.
@@ -121,20 +149,20 @@ export default function CompareView() {
         </div>
         <div className="min-w-[220px]">
           <label htmlFor="tambah-kawasan" className="mb-1.5 block text-[12.5px] font-medium text-ink-3">
-            Tambah kawasan {penuh ? `(maksimal ${MAKS_BANDING})` : ''}
+            {titik ? 'Tambah pusat kelurahan' : 'Tambah kawasan'} {penuh ? `(maksimal ${MAKS_BANDING})` : ''}
           </label>
           <select
             id="tambah-kawasan"
             value=""
             disabled={penuh || status !== 'siap'}
-            onChange={(e) => e.target.value && toggleBanding(e.target.value)}
+            onChange={(e) => e.target.value && tambahKelurahan(e.target.value)}
             className="h-11 w-full rounded-[12px] border border-line-2 bg-surface px-3 text-[14px] text-ink disabled:opacity-50"
           >
             <option value="">Pilih kelurahan</option>
             {perKecamatan.map(([kec, list]) => (
               <optgroup key={kec} label={kec}>
                 {list.map((k) => (
-                  <option key={k.id} value={k.id} disabled={banding.includes(k.id)}>
+                  <option key={k.id} value={k.id} disabled={terpakai.has(kunciTitik(k.pusat))}>
                     {k.nama}
                   </option>
                 ))}
@@ -142,26 +170,27 @@ export default function CompareView() {
             ))}
           </select>
         </div>
-        {dipilih.length > 0 && (
+        {baris.length > 0 && (
           <Button varian="ghost" onClick={kosongkan} ikon={<Trash size={17} />}>
             Kosongkan
           </Button>
         )}
       </div>
+      {titik && <p className="mt-2 max-w-[65ch] text-[12.5px] text-ink-3">Untuk membandingkan titik tertentu, buka laporannya di peta lalu tekan Bandingkan.</p>}
 
       {status === 'memuat' && <Skeleton className="mt-6 h-56 w-full" />}
 
-      {status === 'siap' && dipilih.length === 0 && (
+      {status === 'siap' && baris.length === 0 && (
         <Card className="mt-6 p-6 md:p-8">
           <h2 className="text-[19px] font-bold text-ink">Belum ada lokasi yang dibandingkan</h2>
           <p className="mt-2 max-w-[60ch] text-[14.5px] leading-relaxed text-ink-2">
-            Tambahkan kawasan dari pilihan di atas, atau buka sebuah laporan di peta lalu tekan tombol Bandingkan. Anda bisa membandingkan sampai {MAKS_BANDING} kawasan.
+            Buka sebuah laporan di peta lalu tekan tombol Bandingkan, atau tambahkan dari pilihan di atas. Anda bisa membandingkan sampai {MAKS_BANDING} lokasi.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {CONTOH.map((nama) => {
               const k = kawasan.find((x) => x.nama === nama)
               return k ? (
-                <Chip key={nama} onClick={() => toggleBanding(k.id)}>
+                <Chip key={nama} onClick={() => toggleBanding(titikKelurahan(k))}>
                   Tambah {nama}
                 </Chip>
               ) : null
@@ -170,44 +199,47 @@ export default function CompareView() {
         </Card>
       )}
 
-      {dipilih.length > 0 && (
+      {baris.length > 0 && (
         <>
-          <div className={cx('mt-6 grid gap-4', dipilih.length === 1 ? 'md:grid-cols-1' : dipilih.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3')}>
-            {dipilih.map((k) => {
+          <div className={cx('mt-6 grid gap-4', baris.length === 1 ? 'md:grid-cols-1' : baris.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3')}>
+            {baris.map(({ kunci, t, b }) => {
+              const k = b.data
               const kat = klasifikasi(k.laju, k.memadai, thresholds)
               const ada = k.memadai && k.laju != null
               return (
-                <Card key={k.id} className="flex flex-col p-5">
+                <Card key={kunci} className="flex flex-col p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h2 className="truncate text-[18px] font-bold text-ink">Kelurahan {k.nama}</h2>
-                      <p className="text-[13px] text-ink-2">Kecamatan {k.kecamatan}</p>
+                      <h2 className="truncate text-[18px] font-bold text-ink">{t.label}</h2>
+                      <p className="text-[13px] text-ink-2">
+                        {titik ? `Kelurahan ${b.kelurahan.nama}, ` : ''}Kecamatan {b.kelurahan.kecamatan}
+                      </p>
                     </div>
                     <KategoriBadge kategori={kat} className="shrink-0" />
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="text-[30px] font-bold leading-none tracking-tight text-ink">{ada ? teksLaju(k.laju, k.sigma) : 'Data tidak memadai'}</span>
+                    <span className="text-[30px] font-bold leading-none tracking-tight text-ink">{ada ? teksLaju(Math.max(0, k.laju!), k.sigma) : 'Data tidak memadai'}</span>
                     {ada && <span className="text-[13px] text-ink-3">cm/tahun</span>}
                   </div>
-                  <p className="mt-2 text-[13.5px] leading-snug text-ink-2">{kalimatStatus(k.laju, k.sigma, kat)}</p>
+                  <p className="mt-2 text-[13.5px] leading-snug text-ink-2">{kalimatStatus(k.laju, k.sigma, kat, titik)}</p>
                   <table className="mt-4 w-full text-[13.5px]">
                     <caption className="mb-1 text-left text-[12.5px] font-semibold text-ink-2">Proyeksi Tenor</caption>
                     <tbody>
-                      {TENORS.map((t) => (
-                        <tr key={t} className={cx('border-t border-line', t === tenor && 'bg-surface-2 font-bold')}>
+                      {TENORS.map((tn) => (
+                        <tr key={tn} className={cx('border-t border-line', tn === tenor && 'bg-surface-2 font-bold')}>
                           <th scope="row" className="px-2 py-1.5 text-left font-[inherit] text-ink-2">
-                            {t} tahun
+                            {tn} tahun
                           </th>
-                          <td className="tnum px-2 py-1.5 text-right text-ink">{ada ? teksProyeksi(hitungProyeksi(k.laju!, k.sigma ?? 0, t)) : '-'}</td>
+                          <td className="tnum px-2 py-1.5 text-right text-ink">{ada ? teksProyeksi(hitungProyeksi(k.laju!, k.sigma ?? 0, tn)) : '-'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   <div className="mt-auto flex gap-2 pt-4">
-                    <Button ukuran="sm" onClick={() => bukaDiPeta(k.id)} ikon={<MapTrifold size={16} />}>
+                    <Button ukuran="sm" onClick={() => bukaDiPeta(t)} ikon={<MapTrifold size={16} />}>
                       Lihat di peta
                     </Button>
-                    <Button ukuran="sm" varian="ghost" onClick={() => toggleBanding(k.id)}>
+                    <Button ukuran="sm" varian="ghost" onClick={() => toggleBanding(t)}>
                       Hapus
                     </Button>
                   </div>
@@ -226,12 +258,16 @@ export default function CompareView() {
             </div>
             {berdata.length >= 2 && terendah && tertinggi && (
               <p className="mt-3 text-[14px] leading-snug text-ink">
-                Proyeksi tengah terendah: Kelurahan {terendah.k.nama} ({teksProyeksi(terendah.p!)}). Tertinggi: Kelurahan {tertinggi.k.nama} ({teksProyeksi(tertinggi.p!)}).
+                Proyeksi tengah terendah: {terendah.t.label} ({teksProyeksi(terendah.p!)}). Tertinggi: {tertinggi.t.label} ({teksProyeksi(tertinggi.p!)}).
               </p>
             )}
           </Card>
 
-          <Notice className="mt-4 max-w-[720px]">Perbandingan ini bersifat kawasan, bukan per bangunan. Selalu dibaca jika tren bertahan.</Notice>
+          <Notice className="mt-4 max-w-[720px]">
+            {titik
+              ? `Tiap angka menggambarkan blok sekitar ${lebarBlokM(grid)} m di sekitar titiknya, bukan satu bangunan. Selalu dibaca jika tren bertahan.`
+              : 'Perbandingan ini bersifat kawasan, bukan per bangunan. Selalu dibaca jika tren bertahan.'}
+          </Notice>
         </>
       )}
     </div>

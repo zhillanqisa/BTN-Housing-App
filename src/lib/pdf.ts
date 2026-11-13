@@ -1,7 +1,7 @@
 // PDF Laporan Ambles: satu halaman A4, vektor penuh (teks, garis, kotak) dengan jsPDF.
 // jsPDF dimuat dinamis supaya tidak membebani muatan awal.
 import type { jsPDF as JsPdf } from 'jspdf'
-import { APP, BATASAN, LABEL_KATEGORI, TENORS, WARNA_KATEGORI } from './config'
+import { APP, batasan, LABEL_KATEGORI, TENORS, WARNA_KATEGORI } from './config'
 import { unduhBerkas } from './data'
 import { fmt, fmtKoordinat, fmtPeriode, fmtTanggal, slug } from './format'
 import { hitungProyeksi, kalimatProyeksi, kalimatStatus, langkahBerikutnya, teksLaju, teksProyeksi } from './risk'
@@ -16,6 +16,9 @@ export interface DataLaporanPdf {
   label: string
   lngLat: Position
   gambarPeta?: string | null
+  /** true: angka berasal dari blok piksel di sekitar titik, bukan rata-rata kelurahan */
+  titik?: boolean
+  lebarBlokM?: number
 }
 
 type RGB = [number, number, number]
@@ -137,6 +140,9 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
   const a = alat(doc)
   const { kawasan: k, kategori, tenor, thresholds: t, meta } = d
   const adaData = k.memadai && k.laju != null
+  const titik = d.titik === true
+  const lebarBlok = d.lebarBlokM ?? 240
+  const diSini = titik ? 'di sekitar titik ini' : 'di kawasan ini'
 
   // ---- kepala ----
   a.teks(APP.nama, M, 21, { ukuran: 14, tebal: true })
@@ -160,11 +166,17 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
   }
 
   // ---- lokasi ----
-  a.teks(`Kelurahan ${k.nama}`, M, y + 7, { ukuran: 19, tebal: true })
-  a.teks(`Kecamatan ${k.kecamatan}, Kota Semarang`, M, y + 12.5, { ukuran: 10.5, warna: ABU })
   const periode = meta.periode[0] && meta.periode[1] ? `Periode data: ${fmtPeriode(meta.periode[0])} sampai ${fmtPeriode(meta.periode[1])}` : ''
   const label = d.label.length > 42 ? `${d.label.slice(0, 41)}...` : d.label
-  a.teks(`Lokasi dipilih: ${label} (${fmtKoordinat(d.lngLat)})${periode ? `.  ${periode}` : ''}`, M, y + 17, { ukuran: 8.3, warna: ABU })
+  if (titik) {
+    a.teks(label, M, y + 7, { ukuran: 19, tebal: true })
+    a.teks(`Kelurahan ${k.nama}, Kecamatan ${k.kecamatan}, Kota Semarang`, M, y + 12.5, { ukuran: 10.5, warna: ABU })
+    a.teks(`Titik ${fmtKoordinat(d.lngLat)}. Angka dari blok sekitar ${lebarBlok} m di sekitar titik.${periode ? `  ${periode}` : ''}`, M, y + 17, { ukuran: 8.3, warna: ABU })
+  } else {
+    a.teks(`Kelurahan ${k.nama}`, M, y + 7, { ukuran: 19, tebal: true })
+    a.teks(`Kecamatan ${k.kecamatan}, Kota Semarang`, M, y + 12.5, { ukuran: 10.5, warna: ABU })
+    a.teks(`Lokasi dipilih: ${label} (${fmtKoordinat(d.lngLat)})${periode ? `.  ${periode}` : ''}`, M, y + 17, { ukuran: 8.3, warna: ABU })
+  }
   y += 22
 
   // ---- status (kiri) + peta (kanan) ----
@@ -188,9 +200,9 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
       /* gambar peta tidak terbaca: lanjut tanpa peta */
     }
   }
-  a.judul('Status kawasan', y + 3)
+  a.judul(titik ? 'Status di titik ini' : 'Status kawasan', y + 3)
   if (adaData) {
-    const angka = teksLaju(k.laju, k.sigma)
+    const angka = teksLaju(Math.max(0, k.laju!), k.sigma)
     a.teks(angka, M, y + 14, { ukuran: 24, tebal: true })
     a.teks('cm/tahun', M + a.lebarTeks(angka, { ukuran: 24, tebal: true }) + 2, y + 14, { ukuran: 10, warna: ABU })
   } else {
@@ -201,7 +213,7 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
   doc.setFillColor(...rgb(WARNA_KATEGORI.light[kategori]))
   doc.roundedRect(M, y + 17.5, lebarChip, 6.4, 3.2, 3.2, 'F')
   a.teks(labelKat, M + 3.5, y + 21.9, { ukuran: 8.5, tebal: true, warna: kategori === 'tinggi' || kategori === 'sedang' ? [255, 255, 255] : TINTA })
-  const yKiri = a.paragraf(kalimatStatus(k.laju, k.sigma, kategori), M, y + 30, lebarKiri, { ukuran: 9.5 })
+  const yKiri = a.paragraf(kalimatStatus(k.laju, k.sigma, kategori, titik), M, y + 30, lebarKiri, { ukuran: 9.5 })
   y = Math.max(yKiri, yKanan) + 3
 
   // ---- riwayat ----
@@ -212,7 +224,7 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
     a.teks('Perpindahan kumulatif (cm). Negatif = turun.', M, y + 31.5, { ukuran: 7.3, warna: ABU })
     y += 35
   } else {
-    y = a.paragraf('Riwayat tidak ditampilkan karena data satelit di kawasan ini belum memadai.', M, y + 3, LEBAR, { ukuran: 9, warna: ABU }) + 3
+    y = a.paragraf(`Riwayat tidak ditampilkan karena data satelit ${diSini} belum memadai.`, M, y + 3, LEBAR, { ukuran: 9, warna: ABU }) + 3
   }
 
   // ---- proyeksi tenor ----
@@ -237,14 +249,14 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
     a.teks('Rumus: laju × tenor, dengan rentang dari ketidakpastian laju. Tren masa lalu bisa berubah.', M, y + 4.3, { ukuran: 7.8, warna: ABU })
     y += 8
   } else {
-    y = a.paragraf('Proyeksi tidak ditampilkan karena data satelit di kawasan ini belum memadai.', M, y + 3, LEBAR, { ukuran: 9, warna: ABU }) + 3
+    y = a.paragraf(`Proyeksi tidak ditampilkan karena data satelit ${diSini} belum memadai.`, M, y + 3, LEBAR, { ukuran: 9, warna: ABU }) + 3
   }
 
   // ---- kaki: batasan, ambang, metode, sumber (ditambatkan ke bawah halaman) ----
   const potong = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s)
   const gayaKaki: Gaya = { ukuran: 6.8, warna: ABU }
   const kaki = [
-    `Batasan: ${BATASAN.join(' ')}`,
+    `Batasan: ${batasan(titik, lebarBlok).join(' ')}`,
     `Kategori: rendah di bawah ${fmt(t.sedang, 1)}, sedang ${fmt(t.sedang, 1)} sampai di bawah ${fmt(t.tinggi, 1)}, tinggi mulai ${fmt(t.tinggi, 1)} cm/tahun (asumsi awal).`,
     `Metode: ${potong(meta.metode, 230)}`,
     `Sumber: ${meta.sumber.map((s) => s.nama).join('; ') || '-'}. Batas wilayah © OpenStreetMap contributors.`,
@@ -283,5 +295,5 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
 
 export async function unduhLaporanPdf(d: DataLaporanPdf): Promise<void> {
   const blob = await buatLaporanPdf(d)
-  unduhBerkas(`laporan-ambles-${slug(d.kawasan.nama)}.pdf`, blob)
+  unduhBerkas(`laporan-ambles-${slug(d.titik ? `${d.label} ${d.kawasan.nama}` : d.kawasan.nama)}.pdf`, blob)
 }

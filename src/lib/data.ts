@@ -1,8 +1,8 @@
-// Muat, validasi, dan indeks dataset kawasan.
+// Muat, validasi, dan indeks dataset kawasan (agregat per kelurahan).
 // Format file: GeoJSON FeatureCollection + anggota "metadata" (lihat types.ts).
 import { DATA_URL } from './config'
 import { areaKm2, bboxOf, inBBox, pointInGeometry, pusatOf } from './geo'
-import type { Dataset, DatasetMeta, Kawasan, KawasanFeature, KawasanGeometry, Position } from './types'
+import type { Dataset, DatasetMeta, Kawasan, KawasanFeature, KawasanGeometry, Position, ProsesMeta, ValidasiProses } from './types'
 
 export type HasilValidasi =
   | { ok: true; dataset: Dataset; peringatan: string[] }
@@ -42,6 +42,46 @@ export const META_BAWAAN: DatasetMeta = {
   catatan: '',
 }
 
+/** Catatan proses dari pipeline. Dibaca longgar: bagian yang tidak sah diabaikan, bukan menggagalkan dataset. */
+function bacaProses(raw: unknown): ProsesMeta | undefined {
+  if (!isObj(raw)) return undefined
+  const lintasan = Array.isArray(raw.lintasan)
+    ? raw.lintasan.filter(isObj).map((l) => ({
+        arah: l.arah === 'ascending' ? ('ascending' as const) : ('descending' as const),
+        path: angka(l.path) ?? 0,
+        nCitra: angka(l.nCitra) ?? 0,
+        nPasangan: angka(l.nPasangan) ?? 0,
+      }))
+    : []
+  let validasi: ValidasiProses | undefined
+  if (isObj(raw.validasi)) {
+    const v = raw.validasi
+    const al = isObj(v.antarLintasan) ? v.antarLintasan : null
+    const rmse = al ? angka(al.rmse) : null
+    validasi = {
+      antarLintasan: al && rmse != null ? { n: angka(al.n) ?? 0, rmse, bias: angka(al.bias) ?? 0, r: angka(al.r) ?? 0 } : undefined,
+      gnss: Array.isArray(v.gnss)
+        ? v.gnss.filter(isObj).flatMap((g) => {
+            const gnss = angka(g.gnss)
+            const insar = angka(g.insar)
+            return gnss != null && insar != null ? [{ stasiun: String(g.stasiun ?? ''), gnss, insar }] : []
+          })
+        : undefined,
+      lulus: v.lulus === true,
+      catatan: typeof v.catatan === 'string' ? v.catatan : undefined,
+    }
+  }
+  return {
+    lintasan,
+    resolusiM: angka(raw.resolusiM) ?? 0,
+    referensi: typeof raw.referensi === 'string' ? raw.referensi : '',
+    koreksiAtmosfer: typeof raw.koreksiAtmosfer === 'string' ? raw.koreksiAtmosfer : '',
+    vertikal: raw.vertikal === 'dua-lintasan' ? 'dua-lintasan' : 'satu-lintasan',
+    validasi,
+    konteks: Array.isArray(raw.konteks) ? raw.konteks.filter((k): k is string => typeof k === 'string') : undefined,
+  }
+}
+
 function bacaMeta(raw: unknown, bawaan: DatasetMeta): DatasetMeta {
   if (!isObj(raw)) return bawaan
   const jenis = raw.jenis === 'demo' || raw.jenis === 'olahan' || raw.jenis === 'unggahan' ? raw.jenis : bawaan.jenis
@@ -54,8 +94,10 @@ function bacaMeta(raw: unknown, bawaan: DatasetMeta): DatasetMeta {
         catatan: typeof s.catatan === 'string' ? s.catatan : undefined,
       }))
     : bawaan.sumber
+  const proses = bacaProses(raw.proses)
   return {
     jenis,
+    ...(proses ? { proses } : {}),
     judul: typeof raw.judul === 'string' ? raw.judul : bawaan.judul,
     wilayah: typeof raw.wilayah === 'string' ? raw.wilayah : bawaan.wilayah,
     periode,
@@ -115,6 +157,9 @@ export function validasiDataset(raw: unknown, bawaan: DatasetMeta = META_BAWAAN)
           .filter((d): d is [number, number] => Array.isArray(d) && typeof d[0] === 'number' && typeof d[1] === 'number')
           .map((d) => [d[0], d[1]] as [number, number])
       : []
+    const sb = Array.isArray(p.sebaran) && p.sebaran.length === 2 ? [angka(p.sebaran[0]), angka(p.sebaran[1])] : null
+    const sebaran = sb && sb[0] != null && sb[1] != null ? ([sb[0], sb[1]] as [number, number]) : null
+    const elevasiM = angka(p.elevasiM)
 
     features.push({
       type: 'Feature',
@@ -130,6 +175,8 @@ export function validasiDataset(raw: unknown, bawaan: DatasetMeta = META_BAWAAN)
         memadai,
         deret: memadai ? deret : [],
         jarakPantaiKm: angka(p.jarakPantaiKm),
+        ...(memadai && sebaran ? { sebaran } : {}),
+        ...(elevasiM != null ? { elevasiM } : {}),
       },
     })
   })

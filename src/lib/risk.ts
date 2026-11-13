@@ -49,16 +49,17 @@ const KAT_KALIMAT: Record<Kategori, string> = {
   'tidak-memadai': 'data tidak memadai',
 }
 
-/** Kalimat status kawasan untuk orang awam. */
-export function kalimatStatus(laju: number | null, sigma: number | null, kategori: Kategori): string {
+/** Kalimat status untuk orang awam. titik=true: angka berasal dari blok piksel di sekitar titik. */
+export function kalimatStatus(laju: number | null, sigma: number | null, kategori: Kategori, titik = false): string {
   if (kategori === 'tidak-memadai' || laju == null) {
-    return 'Data satelit di kawasan ini belum memadai, jadi laju penurunan tidak ditampilkan.'
+    return `Data satelit ${titik ? 'di sekitar titik ini' : 'di kawasan ini'} belum memadai, jadi laju penurunan tidak ditampilkan.`
   }
+  const subjek = titik ? 'Tanah di sekitar titik ini' : 'Kawasan ini'
   const s = sigma ?? 0
   if (laju + s < 0.5) {
-    return `Kawasan ini relatif stabil: perubahan di bawah 0,5 cm/tahun (${KAT_KALIMAT[kategori]}).`
+    return `${subjek} relatif stabil: perubahan di bawah 0,5 cm/tahun (${KAT_KALIMAT[kategori]}).`
   }
-  return `Kawasan ini turun sekitar ${teksRentangLaju(laju, s)} cm/tahun (${KAT_KALIMAT[kategori]}).`
+  return `${subjek} turun sekitar ${teksRentangLaju(laju, s)} cm/tahun (${KAT_KALIMAT[kategori]}).`
 }
 
 /** Kalimat Proyeksi Tenor. Selalu diawali "Jika tren bertahan" dan berupa rentang. */

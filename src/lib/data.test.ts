@@ -1,4 +1,5 @@
-// Tes data: validasi dataset, file demo asli, impor CSV/GeoJSON, dan pembuatan PDF.
+// Tes data: validasi dataset, file data bawaan, impor CSV/GeoJSON, dan pembuatan PDF.
+// Tes file bawaan berupa invarian, supaya tetap berlaku saat data demo diganti hasil olahan.
 import { describe, expect, it } from 'vitest'
 import mentah from '../../public/data/semarang-kawasan.geojson?raw'
 import { cariKawasanDiTitik, indeksKawasan, validasiDataset } from './data'
@@ -42,26 +43,60 @@ describe('validasiDataset', () => {
     expect(cariKawasanDiTitik([2.5, 0.5], k)?.nama).toBe('B')
     expect(cariKawasanDiTitik([9, 9], k)).toBeNull()
   })
+  it('membaca sebaran, elevasi, dan catatan proses; data lama tanpa field itu tetap sah', () => {
+    const lama = validasiDataset(fc([{ nama: 'A', laju: 1, sigma: 0.2 }]))
+    expect(lama.ok && lama.dataset.features[0]!.properties.sebaran).toBeUndefined()
+    expect(lama.ok && lama.dataset.metadata.proses).toBeUndefined()
+
+    const baru = validasiDataset({
+      ...fc([{ nama: 'A', laju: 3, sigma: 0.5, sebaran: [2.1, '4,2'], elevasiM: 3.5 }, { nama: 'B', laju: 1, sigma: 0.1, sebaran: [1] }]),
+      metadata: {
+        jenis: 'olahan',
+        proses: {
+          lintasan: [{ arah: 'descending', path: 76, nCitra: 170, nPasangan: 510 }, { arah: 'ascending', path: 127, nCitra: 260, nPasangan: 780 }],
+          resolusiM: 80,
+          referensi: 'CSEM',
+          koreksiAtmosfer: 'korelasi ketinggian',
+          vertikal: 'dua-lintasan',
+          validasi: { antarLintasan: { n: 1000, rmse: 0.4, bias: -0.1, r: 0.93 }, gnss: [{ stasiun: 'CSEM', gnss: 0.08, insar: 0.1 }, { stasiun: 'rusak' }], lulus: true },
+          konteks: ['elevasi', 7],
+        },
+      },
+    })
+    if (!baru.ok) throw new Error('harus sah')
+    expect(baru.dataset.features[0]!.properties).toMatchObject({ sebaran: [2.1, 4.2], elevasiM: 3.5 })
+    expect(baru.dataset.features[1]!.properties.sebaran).toBeUndefined()
+    const p = baru.dataset.metadata.proses!
+    expect(p.lintasan).toHaveLength(2)
+    expect(p.lintasan[1]).toMatchObject({ arah: 'ascending', path: 127 })
+    expect(p.vertikal).toBe('dua-lintasan')
+    expect(p.validasi).toMatchObject({ lulus: true, antarLintasan: { rmse: 0.4 }, gnss: [{ stasiun: 'CSEM', gnss: 0.08, insar: 0.1 }] })
+    expect(p.konteks).toEqual(['elevasi'])
+  })
 })
 
 const asli = validasiDataset(JSON.parse(mentah))
-if (!asli.ok) throw new Error(`Data demo tidak sah: ${asli.galat.join(' ')}`)
+if (!asli.ok) throw new Error(`Data bawaan tidak sah: ${asli.galat.join(' ')}`)
 const kawasan = indeksKawasan(asli.dataset)
+const demo = asli.dataset.metadata.jenis === 'demo'
 
-describe('file data demo', () => {
-  it('177 kelurahan, ditandai demo, id unik', () => {
+describe('file data bawaan', () => {
+  it('177 kelurahan, jenis demo atau olahan, id unik', () => {
     expect(kawasan).toHaveLength(177)
-    expect(asli.dataset.metadata.jenis).toBe('demo')
+    expect(['demo', 'olahan']).toContain(asli.dataset.metadata.jenis)
     expect(new Set(kawasan.map((k) => k.id)).size).toBe(177)
     expect(new Set(kawasan.map((k) => k.kecamatan)).size).toBe(16)
   })
-  it('kawasan memadai punya laju, ketidakpastian, dan deret 36 titik', () => {
+  it('kawasan memadai punya laju wajar, ketidakpastian, sebaran, dan deret yang berawal di nol', () => {
     for (const k of kawasan.filter((x) => x.memadai)) {
       expect(Number.isFinite(k.laju)).toBe(true)
-      expect(k.laju!).toBeGreaterThanOrEqual(0)
+      // cm/tahun: sedikit di bawah nol masih mungkin (derau di area stabil), puluhan cm tidak wajar
+      expect(k.laju!).toBeGreaterThan(-5)
+      expect(k.laju!).toBeLessThan(40)
       expect(k.sigma!).toBeGreaterThanOrEqual(0)
-      expect(k.deret).toHaveLength(36)
+      expect(k.deret.length).toBeGreaterThan(4)
       expect(k.deret[0]![1]).toBe(0)
+      if (k.sebaran) expect(k.sebaran[0]).toBeLessThanOrEqual(k.sebaran[1])
     }
   })
   it('kawasan tidak memadai tidak membawa angka', () => {
@@ -128,8 +163,31 @@ describe('PDF Laporan Ambles', () => {
     expect(blob.size).toBeGreaterThan(5000)
     expect(teks.startsWith('%PDF-')).toBe(true)
     expect(teks).toContain('/Count 1')
-    expect(teks).toContain('DATA DEMO ILUSTRATIF')
+    if (demo) expect(teks).toContain('DATA DEMO ILUSTRATIF')
+    else expect(teks).not.toContain('DATA DEMO ILUSTRATIF')
     expect(teks).toContain('Jika tren bertahan')
+    expect(teks).toContain('Status kawasan')
+  })
+  it('laporan titik menyebut blok di sekitar titik, bukan kawasan', async () => {
+    const k = kawasan.find((x) => x.nama === 'Kaligawe')!
+    const blob = await buatLaporanPdf({
+      kawasan: { ...k, nPiksel: 8, koherensi: null },
+      kategori: klasifikasi(k.laju, k.memadai, { sedang: 2, tinggi: 4 }),
+      tenor: 15,
+      thresholds: { sedang: 2, tinggi: 4 },
+      meta: asli.dataset.metadata,
+      label: 'Titik pilihan',
+      lngLat: k.pusat,
+      gambarPeta: null,
+      titik: true,
+      lebarBlokM: 240,
+    })
+    const teks = new TextDecoder('latin1').decode(await blob.arrayBuffer())
+    expect(teks).toContain('/Count 1')
+    expect(teks).toContain('Status di titik ini')
+    expect(teks).toContain('blok sekitar 240 m')
+    expect(teks).toContain('Kelurahan Kaligawe, Kecamatan')
+    expect(teks).not.toContain('Status kawasan')
   })
   // Untuk memeriksa tata letak dengan mata: VITE_PDF_OUT=<folder> npx vitest run
   it.skipIf(!import.meta.env.VITE_PDF_OUT)('menulis contoh PDF ke folder VITE_PDF_OUT', async () => {

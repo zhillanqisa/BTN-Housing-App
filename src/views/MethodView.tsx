@@ -1,15 +1,17 @@
 // Halaman "Data & metode": dari mana angkanya, cara membacanya, batasannya,
-// dan tempat mengganti data demo dengan data tim (CSV / GeoJSON).
+// hasil validasi, dan tempat mengunggah data per kelurahan (CSV / GeoJSON).
+// Status tiap langkah dan sumber dihitung dari metadata dataset, bukan ditulis mati.
 import { useRef, useState, type ReactNode } from 'react'
 import { ArrowCounterClockwise, ArrowRight, DownloadSimple, UploadSimple } from '@phosphor-icons/react'
-import { BATASAN, LABEL_KATEGORI, PRINSIP, TENORS, URUTAN_KATEGORI } from '../lib/config'
+import { batasan, LABEL_KATEGORI, PRINSIP, TENORS, URUTAN_KATEGORI } from '../lib/config'
 import { keDataset, unduhBerkas } from '../lib/data'
 import { fmt, fmtPeriode, fmtTanggal } from '../lib/format'
+import { lebarBlokM } from '../lib/grid'
 import { imporCSV, imporGeoJSON, templatCSV, type HasilImpor } from '../lib/importer'
 import { hitungProyeksi, kalimatProyeksi } from '../lib/risk'
 import { navigasi } from '../lib/router'
 import { useApp } from '../lib/store'
-import type { Kategori, Tenor } from '../lib/types'
+import type { DatasetMeta, Kategori, Tenor } from '../lib/types'
 import { Button, Card, Chip, cx, Notice, Segmented, Skeleton, Swatch } from '../ui/primitives'
 
 const BAGIAN = [
@@ -18,33 +20,75 @@ const BAGIAN = [
   ['proyeksi', 'Proyeksi Tenor'],
   ['alur', 'Alur olah data'],
   ['sumber', 'Sumber data'],
+  ['validasi', 'Validasi'],
   ['batasan', 'Batasan'],
-  ['ganti-data', 'Ganti data'],
+  ['ganti-data', 'Unggah data'],
 ] as const
 
-const ALUR: { judul: string; isi: string; sudah?: boolean }[] = [
-  { judul: 'Citra radar Sentinel-1', isi: 'Citra satelit radar gratis yang melintas tiap beberapa hari. Dicari lewat ASF Vertex.' },
-  { judul: 'Interferogram', isi: 'Pasangan citra dibandingkan untuk melihat perubahan jarak ke permukaan tanah. Diolah di ASF HyP3 (pasangan small baseline).' },
-  { judul: 'Deret waktu SBAS', isi: 'Banyak interferogram disusun menjadi laju dan riwayat per piksel dengan MintPy.' },
-  { judul: 'Koreksi atmosfer dan titik referensi stabil', isi: 'Gangguan atmosfer dikurangi (GACOS atau ERA5). Acuan dipilih di area stabil dekat stasiun CSEM.' },
-  { judul: 'Gerak garis pandang menjadi vertikal', isi: 'Bila hanya satu lintasan yang dipakai, berlaku asumsi gerak dominan vertikal.' },
-  { judul: 'Validasi dengan GNSS dan publikasi', isi: 'Hasil dibandingkan dengan dataset GNSS Pantura (Susilo dkk. 2023) dan angka penelitian terdahulu.' },
-  { judul: 'Agregasi per kelurahan', isi: 'Median, jumlah piksel, dan sebaran per kelurahan. Koherensi rendah ditandai data tidak memadai.' },
-  { judul: 'Kategori dan Proyeksi Tenor', isi: 'Laju dikelompokkan dengan ambang terbuka, lalu diproyeksikan selama tenor KPR.', sudah: true },
-  { judul: 'Ekspor ke web (GeoJSON)', isi: 'Satu file per kota yang dibaca langsung oleh aplikasi ini.', sudah: true },
-]
+type StatusPil = 'Selesai' | 'Dipakai' | 'Sudah di demo' | 'Rencana' | 'Perlu dicek' | 'Tidak tercatat'
 
-const SUMBER: [string, string, 'Dipakai' | 'Rencana' | 'Perlu dicek'][] = [
-  ['Batas kelurahan (OpenStreetMap)', 'Unit kawasan', 'Dipakai'],
-  ['Peta dasar (OpenFreeMap, OpenMapTiles)', 'Tampilan peta', 'Dipakai'],
-  ['Pencarian alamat (Nominatim)', 'Cari lokasi', 'Dipakai'],
-  ['Sentinel-1 lewat ASF HyP3', 'Laju penurunan', 'Rencana'],
-  ['GNSS CORS Pantura (Susilo dkk. 2023)', 'Validasi', 'Rencana'],
-  ['DEMNAS atau Copernicus DEM', 'Konteks elevasi', 'Rencana'],
-  ['Genangan rob dan pasang surut', 'Konteks rob', 'Perlu dicek'],
-  ['Tata ruang (GISTARU)', 'Konteks kawasan', 'Perlu dicek'],
-  ['Peta geologi 1:100.000', 'Penjelasan penyebab', 'Perlu dicek'],
-]
+/** Catatan proses hanya dipercaya bila dataset memang ditandai hasil olahan. */
+const prosesOlahan = (meta: DatasetMeta | null) => (meta?.jenis === 'olahan' ? meta.proses : undefined)
+
+function susunAlur(meta: DatasetMeta | null): { judul: string; isi: string; status: StatusPil }[] {
+  const p = prosesOlahan(meta)
+  const olah: StatusPil = p ? 'Selesai' : meta?.jenis === 'demo' ? 'Rencana' : 'Tidak tercatat'
+  const akhir: StatusPil = p ? 'Selesai' : meta?.jenis === 'demo' ? 'Sudah di demo' : 'Dipakai'
+  const lintasan = p?.lintasan.map((l) => `${l.arah} path ${l.path} (${fmt(l.nCitra)} citra, ${fmt(l.nPasangan)} pasangan)`).join(' dan ')
+  return [
+    {
+      judul: 'Citra radar Sentinel-1',
+      isi: lintasan ? `Citra satelit radar gratis. Dipakai: ${lintasan}.` : 'Citra satelit radar gratis yang melintas tiap beberapa hari. Dicari lewat katalog ASF.',
+      status: olah,
+    },
+    { judul: 'Interferogram', isi: 'Pasangan citra dibandingkan untuk melihat perubahan jarak ke permukaan tanah. Diolah di ASF HyP3 (pasangan small baseline).', status: olah },
+    { judul: 'Deret waktu SBAS', isi: 'Banyak interferogram disusun menjadi laju dan riwayat per piksel dengan MintPy.', status: olah },
+    {
+      judul: 'Koreksi atmosfer dan titik referensi stabil',
+      isi: p
+        ? `Koreksi atmosfer: ${p.koreksiAtmosfer || 'tidak dicatat'}. Titik referensi: ${p.referensi || 'tidak dicatat'}.`
+        : 'Gangguan atmosfer dikurangi. Acuan dipilih di area stabil dekat stasiun GNSS CSEM.',
+      status: olah,
+    },
+    {
+      judul: 'Gerak garis pandang menjadi vertikal',
+      isi:
+        p?.vertikal === 'satu-lintasan'
+          ? 'Hanya satu lintasan yang dipakai, jadi berlaku asumsi gerak dominan vertikal.'
+          : 'Dua lintasan satelit (naik dan turun) digabung menjadi gerak vertikal. Piksel yang hanya punya satu lintasan memakai asumsi gerak dominan vertikal.',
+      status: olah,
+    },
+    {
+      judul: 'Validasi',
+      isi: 'Hasil dua lintasan satelit dibandingkan satu sama lain, diikat ke stasiun GNSS CSEM (Susilo dkk. 2023), dan dibandingkan dengan angka penelitian terdahulu.',
+      status: p ? (p.validasi ? 'Selesai' : 'Rencana') : olah,
+    },
+    {
+      judul: 'Grid piksel dan ringkasan kelurahan',
+      isi: 'Laju per piksel sekitar 80 m untuk laporan titik, plus median dan sebaran per kelurahan untuk Dashboard. Piksel yang tidak terukur ditandai data tidak memadai.',
+      status: akhir,
+    },
+    { judul: 'Kategori dan Proyeksi Tenor', isi: 'Laju dikelompokkan dengan ambang terbuka, lalu diproyeksikan selama tenor KPR.', status: akhir },
+    { judul: 'Ekspor ke web', isi: 'File grid dan ringkasan kelurahan yang dibaca langsung oleh aplikasi ini.', status: akhir },
+  ]
+}
+
+function susunSumber(meta: DatasetMeta | null): [string, string, StatusPil][] {
+  const p = prosesOlahan(meta)
+  const konteks = new Set(p?.konteks ?? [])
+  const lapis = (kunci: string, bila: StatusPil): StatusPil => (konteks.has(kunci) ? 'Dipakai' : bila)
+  return [
+    ['Batas kelurahan (OpenStreetMap)', 'Nama lokasi dan ringkasan', 'Dipakai'],
+    ['Peta dasar (OpenFreeMap, OpenMapTiles)', 'Tampilan peta', 'Dipakai'],
+    ['Pencarian alamat (Nominatim)', 'Cari lokasi', 'Dipakai'],
+    ['Sentinel-1 lewat ASF HyP3', 'Laju penurunan', p ? 'Dipakai' : 'Rencana'],
+    ['GNSS CORS Pantura (Susilo dkk. 2023)', 'Titik ikat dan validasi', p?.validasi?.gnss?.length ? 'Dipakai' : 'Rencana'],
+    ['DEM Copernicus GLO-30', 'Konteks elevasi', lapis('elevasi', 'Rencana')],
+    ['Genangan rob dan pasang surut', 'Konteks rob', lapis('rob', 'Perlu dicek')],
+    ['Tata ruang (GISTARU)', 'Konteks kawasan', lapis('tata-ruang', 'Perlu dicek')],
+    ['Peta geologi 1:100.000', 'Penjelasan penyebab', lapis('geologi', 'Perlu dicek')],
+  ]
+}
 
 const ARTI: Record<Kategori, string> = {
   rendah: 'Perubahan kecil. Tetap lakukan pemeriksaan standar sebelum akad.',
@@ -58,7 +102,7 @@ function Pil({ teks }: { teks: string }) {
     <span
       className={cx(
         'inline-flex h-6 shrink-0 items-center rounded-full border px-2.5 text-[11.5px] font-semibold',
-        teks === 'Dipakai' || teks === 'Sudah di demo'
+        teks === 'Dipakai' || teks === 'Sudah di demo' || teks === 'Selesai'
           ? 'border-transparent bg-ink text-surface'
           : teks === 'Perlu dicek'
             ? 'border-notice-line bg-notice-bg text-notice-ink'
@@ -160,8 +204,9 @@ function GantiData() {
   return (
     <>
       <p>
-        Hasil olah tim bisa langsung menggantikan data demo. Unggah GeoJSON lengkap, atau CSV yang berisi laju per kelurahan. CSV digabung ke batas kelurahan yang sedang dimuat.
+        Anda bisa memakai data per kelurahan sendiri. Unggah GeoJSON lengkap, atau CSV yang berisi laju per kelurahan. CSV digabung ke batas kelurahan yang sedang dimuat.
       </p>
+      <p>Data unggahan tidak membawa grid piksel. Selama data unggahan dipakai, peta dan laporan beralih ke rata-rata kelurahan, bukan angka per titik.</p>
       <div
         onDragOver={(e) => {
           e.preventDefault()
@@ -266,7 +311,7 @@ function GantiData() {
         >
           Unduh data saat ini (GeoJSON)
         </Button>
-        {meta && meta.jenis !== 'demo' && (
+        {meta && meta.jenis === 'unggahan' && (
           <Button
             ukuran="sm"
             varian="ghost"
@@ -276,7 +321,7 @@ function GantiData() {
             }}
             ikon={<ArrowCounterClockwise size={16} />}
           >
-            Kembali ke data demo
+            Kembali ke data bawaan
           </Button>
         )}
       </div>
@@ -294,8 +339,16 @@ export default function MethodView() {
   const status = useApp((s) => s.status)
   const meta = useApp((s) => s.meta)
   const kawasan = useApp((s) => s.kawasan)
+  const grid = useApp((s) => s.grid)
   const t = useApp((s) => s.thresholds)
   const memadai = kawasan.filter((k) => k.memadai).length
+  const titik = !!grid
+  const lebarBlok = lebarBlokM(grid)
+  const alur = susunAlur(meta)
+  const sumber = susunSumber(meta)
+  const proses = prosesOlahan(meta)
+  const validasi = proses?.validasi
+  const belumJalan = alur.filter((a) => a.status === 'Rencana').length
   const aturan: Record<Kategori, string> = {
     rendah: `Di bawah ${fmt(t.sedang, 1)} cm/tahun`,
     sedang: `${fmt(t.sedang, 1)} sampai di bawah ${fmt(t.tinggi, 1)} cm/tahun`,
@@ -326,7 +379,7 @@ export default function MethodView() {
                 </Notice>
               )}
               {meta.jenis === 'unggahan' && <Notice>Anda sedang memakai data unggahan. Data ini hanya ada di peramban Anda dan hilang saat halaman dimuat ulang.</Notice>}
-              {meta.jenis === 'olahan' && <Notice>Data ini ditandai sebagai hasil olah tim.</Notice>}
+              {meta.jenis === 'olahan' && <Notice>Data ini hasil olah citra satelit. Angka validasinya ada di bagian Validasi di bawah.</Notice>}
               <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-[14px]">
                 <dt className="text-ink-3">Judul</dt>
                 <dd className="text-ink">{meta.judul}</dd>
@@ -346,6 +399,12 @@ export default function MethodView() {
                     <dd className="text-ink">{fmtTanggal(meta.dibuat)}</dd>
                   </>
                 )}
+                <dt className="text-ink-3">Unit laporan</dt>
+                <dd className="tnum text-ink">
+                  {grid
+                    ? `Titik: blok sekitar ${lebarBlok} m dari grid piksel ${fmt(grid.kepala.ukuranSelM)} m (${fmt(grid.kepala.nValid)} piksel terukur)`
+                    : 'Kelurahan (data ini tidak membawa grid piksel)'}
+                </dd>
                 <dt className="text-ink-3">Kawasan</dt>
                 <dd className="tnum text-ink">
                   {fmt(kawasan.length)} kelurahan, {fmt(memadai)} dengan data memadai, {fmt(kawasan.length - memadai)} tidak memadai
@@ -426,15 +485,17 @@ export default function MethodView() {
         </Bagian>
 
         <Bagian id="alur" judul="Alur olah data">
-          <Notice>Langkah 1 sampai 7 belum dijalankan. Peta saat ini memakai data demo ilustratif.</Notice>
+          {meta?.jenis === 'demo' && <Notice>{belumJalan} langkah pertama belum dijalankan. Peta saat ini memakai data demo ilustratif.</Notice>}
+          {meta?.jenis === 'unggahan' && <Notice>Data unggahan tidak membawa catatan cara olahnya. Urutan di bawah adalah alur baku PANTAU AMBLES.</Notice>}
+          {meta?.jenis === 'olahan' && !proses && <Notice>Data ini ditandai hasil olahan, tetapi tidak membawa catatan proses.</Notice>}
           <ol className="space-y-3">
-            {ALUR.map((a, i) => (
+            {alur.map((a, i) => (
               <li key={a.judul} className="flex gap-3">
                 <span className="tnum grid size-7 shrink-0 place-items-center rounded-full bg-surface-2 text-[12.5px] font-bold text-ink">{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[14.5px] font-semibold text-ink">{a.judul}</span>
-                    <Pil teks={a.sudah ? 'Sudah di demo' : 'Rencana'} />
+                    <Pil teks={a.status} />
                   </div>
                   <p className="text-[13.5px]">{a.isi}</p>
                 </div>
@@ -460,7 +521,7 @@ export default function MethodView() {
                 </tr>
               </thead>
               <tbody>
-                {SUMBER.map(([data, guna, st]) => (
+                {sumber.map(([data, guna, st]) => (
                   <tr key={data} className="border-t border-line">
                     <th scope="row" className="py-2.5 pr-4 font-semibold text-ink">
                       {data}
@@ -477,14 +538,51 @@ export default function MethodView() {
           <p className="text-[13px]">Batas wilayah © OpenStreetMap contributors (ODbL). Peta dasar OpenFreeMap © OpenMapTiles, data OpenStreetMap.</p>
         </Bagian>
 
+        <Bagian id="validasi" judul="Validasi">
+          {validasi ? (
+            <>
+              <Notice>{validasi.lulus ? 'Data ini lolos gerbang mutu yang ditetapkan.' : 'Data ini belum lolos gerbang mutu. Baca angka di bawah sebelum memakainya.'}</Notice>
+              <dl className="tnum grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-[14px]">
+                {validasi.antarLintasan && (
+                  <>
+                    <dt className="text-ink-3">Dua lintasan satelit</dt>
+                    <dd className="text-ink">
+                      selisih RMSE {fmt(validasi.antarLintasan.rmse, 2)} cm/tahun, bias {fmt(validasi.antarLintasan.bias, 2)} cm/tahun, korelasi {fmt(validasi.antarLintasan.r, 2)}, dari{' '}
+                      {fmt(validasi.antarLintasan.n)} piksel
+                    </dd>
+                  </>
+                )}
+                {validasi.gnss?.map((g) => (
+                  <div key={g.stasiun} className="contents">
+                    <dt className="text-ink-3">Stasiun GNSS {g.stasiun}</dt>
+                    <dd className="text-ink">
+                      GNSS {fmt(g.gnss, 2)} cm/tahun, InSAR {fmt(g.insar, 2)} cm/tahun, selisih {fmt(Math.abs(g.gnss - g.insar), 2)} cm/tahun
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {validasi.catatan && <p>{validasi.catatan}</p>}
+            </>
+          ) : (
+            <p>
+              Belum ada angka validasi, karena {meta?.jenis === 'demo' ? 'peta masih memakai data demo' : 'data ini tidak membawa catatan validasi'}. Setelah citra satelit diolah, bagian ini memuat selisih antara dua lintasan
+              satelit dan perbandingan dengan stasiun GNSS.
+            </p>
+          )}
+          <p>
+            Di Kota Semarang hanya ada satu stasiun GNSS terbuka, yaitu CSEM, dan letaknya di area stabil. Karena itu GNSS dipakai sebagai titik ikat. Area yang ambles diperiksa lewat kecocokan dua lintasan satelit yang
+            saling independen dan lewat kisaran angka penelitian terdahulu.
+          </p>
+        </Bagian>
+
         <Bagian id="batasan" judul="Batasan">
           <ul className="list-disc space-y-1.5 pl-5">
-            {BATASAN.map((b) => (
+            {batasan(titik, lebarBlok).map((b) => (
               <li key={b}>{b}</li>
             ))}
-            <li>Bila hanya satu lintasan satelit yang dipakai, laju vertikal memakai asumsi gerak dominan vertikal.</li>
+            <li>Piksel yang hanya terukur dari satu lintasan satelit memakai asumsi gerak dominan vertikal.</li>
             <li>Validasi di Semarang bagian bawah masih terbatas karena stasiun GNSS acuan (CSEM) berada di area stabil.</li>
-            <li>Kawasan dengan koherensi rendah ditandai data tidak memadai, bukan dianggap aman.</li>
+            <li>Piksel atau kawasan yang tidak terukur ditandai data tidak memadai, bukan dianggap aman.</li>
           </ul>
           <p className="font-semibold text-ink">{PRINSIP}</p>
         </Bagian>

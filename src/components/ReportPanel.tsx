@@ -1,14 +1,17 @@
 // Laporan Ambles: satu halaman per lokasi.
-// Status kawasan -> Riwayat -> Proyeksi Tenor -> Langkah berikutnya -> Sumber dan batasan.
+// Status -> Riwayat -> Proyeksi Tenor -> Langkah berikutnya -> Sumber dan batasan.
+// Bila dataset punya grid, angkanya dari blok piksel di sekitar titik; bila tidak, rata-rata kelurahan.
 import { useState, type ReactNode } from 'react'
 import { CircleNotch, DownloadSimple, LinkSimple, MapPin, Scales, X } from '@phosphor-icons/react'
-import { BATASAN, MAKS_BANDING, PRINSIP, TENORS } from '../lib/config'
+import { batasan, MAKS_BANDING, PRINSIP, TENORS } from '../lib/config'
 import { fmt, fmtKoordinat, fmtPeriode } from '../lib/format'
-import { kalimatStatus, klasifikasi, langkahBerikutnya } from '../lib/risk'
+import { lebarBlokM } from '../lib/grid'
+import { kunciTitik, LABEL_TITIK } from '../lib/lokasi'
+import { kalimatStatus, klasifikasi, langkahBerikutnya, teksLaju } from '../lib/risk'
 import { navigasi } from '../lib/router'
-import { jembatanPeta, useApp, useKawasan } from '../lib/store'
+import { jembatanPeta, useApp, useBacaan } from '../lib/store'
 import type { Kategori } from '../lib/types'
-import { Button, IconButton, JudulBagian, KategoriBadge, Notice, Segmented } from '../ui/primitives'
+import { Button, IconButton, JudulBagian, KategoriBadge, Notice, Segmented, Skeleton } from '../ui/primitives'
 import HistoryChart from './HistoryChart'
 import TenorVisual from './TenorVisual'
 
@@ -47,7 +50,8 @@ function Langkah({ kategori }: { kategori: Kategori }) {
 
 export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
   const selection = useApp((s) => s.selection)
-  const k = useKawasan(selection?.kawasanId)
+  const bacaan = useBacaan(selection?.lngLat)
+  const grid = useApp((s) => s.grid)
   const thresholds = useApp((s) => s.thresholds)
   const tenor = useApp((s) => s.tenor)
   const setTenor = useApp((s) => s.setTenor)
@@ -59,10 +63,19 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
   const [pesan, setPesan] = useState<string | null>(null)
 
   if (!selection) return null
+  const k = bacaan?.data ?? null
+  const kel = bacaan?.kelurahan ?? null
+  const titik = bacaan?.mode === 'titik'
   const kategori = k ? klasifikasi(k.laju, k.memadai, thresholds) : null
   const adaData = !!k && k.memadai && k.laju != null
-  const diBanding = !!k && banding.includes(k.id)
+  const kunci = kunciTitik(selection.lngLat)
+  const diBanding = banding.some((t) => kunciTitik(t.lngLat) === kunci)
+  const lebarBlok = lebarBlokM(grid)
+  // deret waktu grid dimuat belakangan: tampilkan kerangka, bukan "tidak tersedia"
+  const memuatDeret = titik && adaData && !!grid && !grid.deret
   const periode = meta && meta.periode[0] && meta.periode[1] ? `${fmtPeriode(meta.periode[0])} sampai ${fmtPeriode(meta.periode[1])}` : null
+  const judul = titik ? selection.label : k ? `Kelurahan ${k.nama}` : selection.label
+  const rataKelurahan = kel ? (kel.memadai && kel.laju != null ? `${teksLaju(kel.laju, kel.sigma)} cm/tahun` : 'data tidak memadai') : ''
 
   const kabari = (teks: string) => {
     setPesan(teks)
@@ -73,7 +86,7 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
     setSibuk(true)
     try {
       const { unduhLaporanPdf } = await import('../lib/pdf')
-      await unduhLaporanPdf({ kawasan: k, kategori, tenor, thresholds, meta, label: selection.label, lngLat: selection.lngLat, gambarPeta: jembatanPeta.ambilGambar?.() ?? null })
+      await unduhLaporanPdf({ kawasan: k, kategori, tenor, thresholds, meta, label: selection.label, lngLat: selection.lngLat, gambarPeta: jembatanPeta.ambilGambar?.() ?? null, titik, lebarBlokM: lebarBlok })
     } catch {
       kabari('PDF gagal dibuat. Coba lagi.')
     } finally {
@@ -88,6 +101,11 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
       kabari('Tidak bisa menyalin. Salin tautan dari bilah alamat.')
     }
   }
+  const tambahBanding = () => {
+    if (!k) return
+    const label = !titik ? `Kelurahan ${k.nama}` : selection.label === LABEL_TITIK ? `Titik di ${k.nama}` : selection.label
+    toggleBanding({ lngLat: selection.lngLat, label })
+  }
 
   return (
     <section className="glass pa-enter flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[22px] lg:rounded-[22px]" aria-label="Laporan Ambles">
@@ -98,9 +116,11 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
             <MapPin size={14} aria-hidden="true" />
             Laporan Ambles
           </div>
-          <h2 className="mt-1 truncate text-[22px] font-bold leading-tight tracking-tight text-ink">{k ? `Kelurahan ${k.nama}` : selection.label}</h2>
-          <p className="mt-0.5 text-[13px] text-ink-2">{k ? `Kecamatan ${k.kecamatan}, Kota Semarang` : 'Di luar wilayah uji'}</p>
-          {k && selection.label !== `Kelurahan ${k.nama}` && <p className="truncate text-[12.5px] text-ink-3">Lokasi dipilih: {selection.label}</p>}
+          <h2 className="mt-1 truncate text-[22px] font-bold leading-tight tracking-tight text-ink">{judul}</h2>
+          <p className="mt-0.5 text-[13px] text-ink-2">
+            {!kel ? 'Di luar wilayah uji' : titik ? `Kelurahan ${kel.nama}, Kecamatan ${kel.kecamatan}` : `Kecamatan ${kel.kecamatan}, Kota Semarang`}
+          </p>
+          {k && !titik && selection.label !== `Kelurahan ${k.nama}` && <p className="truncate text-[12.5px] text-ink-3">Lokasi dipilih: {selection.label}</p>}
         </div>
         <IconButton label="Tutup laporan" onClick={tutup}>
           <X size={18} />
@@ -108,7 +128,7 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
       </header>
 
       <div className="scroll-thin min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5">
-        {!k || !kategori ? (
+        {!k || !kel || !kategori ? (
           <div className="space-y-3">
             <p className="text-[14px] leading-relaxed text-ink">
               Titik ini berada di luar Kota Semarang, wilayah uji awal PANTAU AMBLES. Pilih titik di dalam batas kota atau cari nama kelurahan.
@@ -124,25 +144,29 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
             )}
 
             <div>
-              <JudulBagian kanan={<KategoriBadge kategori={kategori} />}>Status kawasan</JudulBagian>
+              <JudulBagian kanan={<KategoriBadge kategori={kategori} />}>{titik ? 'Status di titik ini' : 'Status kawasan'}</JudulBagian>
               {adaData ? (
                 <div className="mt-2 flex items-baseline gap-2">
-                  <span className="text-[46px] font-bold leading-none tracking-tight text-ink">{fmt(k.laju!, 1)}</span>
+                  <span className="text-[46px] font-bold leading-none tracking-tight text-ink">{fmt(Math.max(0, k.laju!), 1)}</span>
                   <span className="text-[14px] font-medium text-ink-2">± {fmt(k.sigma ?? 0, 1)} cm/tahun</span>
                 </div>
               ) : (
                 <p className="mt-2 text-[22px] font-bold leading-tight tracking-tight text-ink">Data tidak memadai</p>
               )}
-              <p className="mt-2 text-[14px] leading-snug text-ink">{kalimatStatus(k.laju, k.sigma, kategori)}</p>
+              <p className="mt-2 text-[14px] leading-snug text-ink">{kalimatStatus(k.laju, k.sigma, kategori, titik)}</p>
+              {titik && adaData && (
+                <p className="mt-1.5 text-[12.5px] leading-snug text-ink-3">
+                  Dari {k.nPiksel} piksel terukur di blok sekitar {lebarBlok} m di sekitar titik
+                  {k.sebaran ? `, antarpiksel ${fmt(Math.max(0, k.sebaran[0]), 1)} sampai ${fmt(Math.max(0, k.sebaran[1]), 1)} cm/tahun` : ''}. Rata-rata Kelurahan {kel.nama}: {rataKelurahan}.
+                </p>
+              )}
             </div>
 
             {adaData ? (
               <>
                 <div className="border-t border-line pt-4">
                   <JudulBagian kanan={periode ? <span className="text-[12px] text-ink-3">{periode}</span> : undefined}>Riwayat</JudulBagian>
-                  <div className="mt-2">
-                    <HistoryChart deret={k.deret} />
-                  </div>
+                  <div className="mt-2">{memuatDeret ? <Skeleton className="h-[132px] w-full" /> : <HistoryChart deret={k.deret} />}</div>
                 </div>
 
                 <div className="border-t border-line pt-4">
@@ -160,16 +184,19 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
                     Proyeksi Tenor
                   </JudulBagian>
                   <div className="mt-3">
-                    <TenorVisual laju={k.laju!} sigma={k.sigma ?? 0} tenor={tenor} />
+                    <TenorVisual laju={Math.max(0, k.laju!)} sigma={k.sigma ?? 0} tenor={tenor} />
                   </div>
                 </div>
               </>
             ) : (
-              <Notice>Riwayat dan proyeksi tidak ditampilkan karena data satelit di kawasan ini belum memadai.</Notice>
+              <Notice>
+                Riwayat dan proyeksi tidak ditampilkan karena data satelit {titik ? 'di sekitar titik ini' : 'di kawasan ini'} belum memadai.
+                {titik && ` Sebagai konteks, rata-rata Kelurahan ${kel.nama}: ${rataKelurahan}. Itu rata-rata kawasan, bukan angka di titik ini.`}
+              </Notice>
             )}
 
             <div className="border-t border-line pt-4">
-              <Langkah key={`${k.id}-${kategori}`} kategori={kategori} />
+              <Langkah key={`${kunci}-${kategori}`} kategori={kategori} />
             </div>
 
             <details className="border-t border-line pt-3 text-[13px] text-ink-2">
@@ -184,15 +211,19 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
                   </>
                 )}
                 <dt className="text-ink-3">Piksel dipakai</dt>
-                <dd className="tnum">{fmt(k.nPiksel)}</dd>
-                <dt className="text-ink-3">Koherensi</dt>
-                <dd className="tnum">{k.koherensi == null ? '-' : fmt(k.koherensi, 2)}</dd>
+                <dd className="tnum">{titik && bacaan ? `${fmt(k.nPiksel)} dari ${fmt(bacaan.nBlok)} di blok` : fmt(k.nPiksel)}</dd>
+                {k.koherensi != null && (
+                  <>
+                    <dt className="text-ink-3">Koherensi</dt>
+                    <dd className="tnum">{fmt(k.koherensi, 2)}</dd>
+                  </>
+                )}
                 <dt className="text-ink-3">Titik</dt>
                 <dd className="font-mono text-[11.5px]">{fmtKoordinat(selection.lngLat)}</dd>
               </dl>
               {meta?.metode && <p className="mt-2 leading-snug">{meta.metode}</p>}
               <ul className="mt-2 list-disc space-y-1 pl-4 leading-snug">
-                {BATASAN.map((b) => (
+                {batasan(titik, lebarBlok).map((b) => (
                   <li key={b}>{b}</li>
                 ))}
               </ul>
@@ -217,7 +248,7 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
               </Button>
             ) : (
               <Button
-                onClick={() => toggleBanding(k.id)}
+                onClick={tambahBanding}
                 disabled={banding.length >= MAKS_BANDING}
                 title={banding.length >= MAKS_BANDING ? `Maksimal ${MAKS_BANDING} lokasi` : 'Tambah ke daftar banding'}
                 ikon={<Scales size={17} />}

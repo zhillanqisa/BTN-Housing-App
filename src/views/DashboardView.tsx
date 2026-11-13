@@ -129,6 +129,7 @@ export default function DashboardView() {
   const setTenor = useApp((s) => s.setTenor)
   const meta = useApp((s) => s.meta)
   const pilihKawasan = useApp((s) => s.pilihKawasan)
+  const adaGrid = useApp((s) => !!s.grid)
   const muatDemo = useApp((s) => s.muatDemo)
 
   const [kec, setKec] = useState('')
@@ -211,6 +212,11 @@ export default function DashboardView() {
     <div className="mx-auto w-full max-w-[1240px] px-4 pb-20 pt-2 md:px-8">
       <h1 className="text-[28px] font-bold tracking-tight text-ink md:text-[34px]">Dashboard kawasan</h1>
       <p className="mt-1 max-w-[65ch] text-[15px] text-ink-2">Pra-skrining banyak lokasi sekaligus untuk pengembang dan lembaga pembiayaan.</p>
+      {adaGrid && (
+        <p className="mt-1 max-w-[65ch] text-[13.5px] text-ink-3">
+          Angka di halaman ini adalah ringkasan per kelurahan (median piksel). Laju bisa berbeda antartitik dalam satu kelurahan, jadi untuk lokasi tertentu buka titiknya di peta.
+        </p>
+      )}
       {meta?.jenis === 'demo' && (
         <Notice nada="demo" className="mt-4 max-w-[720px]">
           <strong>Data demo ilustratif.</strong> Semua angka di halaman ini belum berasal dari pengukuran.

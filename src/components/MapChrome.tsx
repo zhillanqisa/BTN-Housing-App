@@ -14,6 +14,7 @@ export default function MapChrome() {
   const modePeta = useApp((s) => s.modePeta)
   const setModePeta = useApp((s) => s.setModePeta)
   const t = useApp((s) => s.thresholds)
+  const ukuranSel = useApp((s) => s.grid?.kepala.ukuranSelM ?? null)
 
   return (
     <>
@@ -97,6 +98,7 @@ export default function MapChrome() {
           {LABEL_KATEGORI['tidak-memadai']}
         </div>
         {modePeta === 'kategori' && <p className="mt-2 text-[11.5px] leading-snug text-ink-3">Ambang dalam cm/tahun, masih asumsi awal.</p>}
+        {ukuranSel != null && <p className="mt-2 text-[11.5px] leading-snug text-ink-3">Satu kotak di peta = satu piksel, sekitar {fmt(ukuranSel)} m.</p>}
       </Panel>
     </>
   )

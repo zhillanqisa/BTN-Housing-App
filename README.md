@@ -1,6 +1,8 @@
 # PANTAU AMBLES
 
-**Cek Tanah Sebelum KPR.** Web app untuk melihat laju penurunan tanah per kelurahan di Kota Semarang dan proyeksinya selama masa cicilan KPR (Proyeksi Tenor). Dibuat untuk BTN Housingpreneur Batch 3, kategori Housing Innovation.
+**Cek Tanah Sebelum KPR.** Web app untuk melihat laju penurunan tanah di sekitar sebuah titik di Kota Semarang dan proyeksinya selama masa cicilan KPR (Proyeksi Tenor). Dibuat untuk BTN Housingpreneur Batch 3, kategori Housing Innovation.
+
+Laporan mengikuti titik yang dipilih: angkanya dihitung dari blok piksel sekitar 240 m di sekitar titik itu, bukan rata-rata satu kelurahan. Dua titik dalam kelurahan yang sama bisa memberi hasil berbeda.
 
 **Demo:** https://zhillanqisa.github.io/BTN-Housing-App/
 
@@ -23,15 +25,15 @@ Hasil `dist/` berupa file statis dan bisa di-host gratis (GitHub Pages, Netlify,
 
 ## Alur demo yang disarankan
 
-1. Di halaman **Cek lokasi**, klik kartu contoh "Tanah Mas" atau cari nama kelurahan, atau klik titik mana pun di peta.
-2. Baca **Laporan Ambles**: status kawasan, grafik riwayat, lalu Proyeksi Tenor.
+1. Di halaman **Cek lokasi**, klik kartu contoh "Tanah Mas" atau cari alamat, atau klik titik mana pun di peta. Kotak hijau di peta menandai blok piksel yang dipakai untuk laporan.
+2. Baca **Laporan Ambles**: status di titik itu, grafik riwayat, lalu Proyeksi Tenor. Coba klik titik lain di kelurahan yang sama dan bandingkan angkanya.
 3. Ganti tenor 10, 15, 20 tahun dan lihat rumah pada gambar ikut turun.
 4. Tekan **Unduh PDF** untuk laporan satu halaman.
 5. Tekan **Bandingkan**, pilih lokasi lain, lalu buka halaman **Bandingkan**.
 6. Buka **Dashboard** untuk tampilan institusi: filter, grafik, tabel, uji sensitivitas ambang, unduh CSV.
 7. Buka **Data & metode** untuk sumber data, batasan, dan fitur **Ganti data**.
 
-Tautan bisa dibagikan: `#/?k=<id kawasan>&t=<tenor>`.
+Tautan bisa dibagikan: `#/?ll=<lintang>,<bujur>&t=<tenor>`. Tautan lama `#/?k=<id kelurahan>` tetap terbuka dan diarahkan ke pusat kelurahan itu.
 
 ## Struktur proyek
 
@@ -43,7 +45,9 @@ src/
   lib/
     types.ts config.ts tipe data dan semua ambang/asumsi
     risk.ts            kategori, Proyeksi Tenor, kalimat laporan
-    data.ts            muat dan validasi dataset
+    grid.ts            grid piksel: baca file, nilai piksel, statistik blok di sekitar titik
+    lokasi.ts          bacaan satu lokasi (blok piksel, atau kelurahan bila data tanpa grid)
+    data.ts            muat dan validasi ringkasan per kelurahan
     importer.ts        impor CSV / GeoJSON
     pdf.ts             PDF Laporan Ambles (jsPDF, vektor)
     geocode.ts         pencarian lokal + Nominatim
@@ -52,12 +56,41 @@ src/
   styles/app.css       token desain (terang dan gelap)
 scripts/
   fetch-boundaries.mjs batas kelurahan dari OpenStreetMap (npm run data:boundaries)
-  build-demo-data.mjs  data demo ilustratif (npm run data:demo)
+  build-demo-data.mjs  data demo ilustratif: grid piksel dan ringkasan kelurahan (npm run data:demo)
 data-raw/              batas kelurahan, kecamatan, kota (hasil skrip)
-public/data/           semarang-kawasan.geojson, dibaca aplikasi
+public/data/           semarang-grid.* (grid piksel) dan semarang-kawasan.geojson, dibaca aplikasi
 ```
 
 ## Skema data
+
+Aplikasi membaca dua kelompok file di `public/data/`.
+
+### Grid piksel (peta dan laporan titik)
+
+- `semarang-grid.json`: kepala grid.
+- `semarang-grid-laju.bin` dan `semarang-grid-sigma.bin`: Int16 little-endian, satu nilai per piksel, baris pertama paling utara.
+- `semarang-grid-deret.bin`: Int16, deret waktu hanya untuk piksel terukur, urut baris demi baris. Dimuat setelah peta tampil.
+
+```json
+{
+  "versi": 1, "jenis": "olahan", "dibuat": "2026-12-01",
+  "bbox": [110.26, -7.12, 110.51, -6.92],
+  "nx": 336, "ny": 260, "ukuranSelM": 80,
+  "nodata": -32768, "luar": -32767,
+  "skalaLaju": 0.01, "skalaDeret": 0.1,
+  "epoch": [2020.0, 2020.25],
+  "berkas": { "laju": "semarang-grid-laju.bin", "sigma": "semarang-grid-sigma.bin", "deret": "semarang-grid-deret.bin" }
+}
+```
+
+- `bbox`: `[barat, selatan, timur, utara]` tepi luar grid, derajat WGS84.
+- Nilai laju dan sigma × `skalaLaju` = cm/tahun, **positif berarti turun**. Nilai deret × `skalaDeret` = cm, negatif berarti turun.
+- `nodata`: piksel di dalam kota yang tidak terukur. `luar`: piksel di luar batas kota.
+- Laporan titik memakai blok 3 × 3 piksel di sekitar titik: laju = median piksel terukur, dan dianggap memadai bila minimal 4 piksel terukur.
+
+Bila file grid tidak ada, aplikasi tetap jalan dan memakai rata-rata kelurahan.
+
+### Ringkasan per kelurahan (Dashboard dan nama lokasi)
 
 Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = satu kelurahan.
 
@@ -87,15 +120,16 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 ```
 
 - `laju`: cm/tahun, **positif berarti turun**. `sigma`: ketidakpastian, plus minus cm/tahun.
+- `sebaran` (opsional): persentil 10 dan 90 laju piksel di kelurahan itu.
 - `memadai: false` berarti "data tidak memadai" (koherensi rendah atau piksel terlalu sedikit). `laju` diisi `null`.
 - `deret`: pasangan tahun desimal dan perpindahan kumulatif dalam cm (negatif berarti turun).
 - `metadata.jenis`: `demo`, `olahan`, atau `unggahan`. Selama `demo`, aplikasi dan PDF menampilkan penanda data demo.
 
 ## Mengganti data demo dengan hasil olahan tim
 
-1. **Lewat aplikasi:** halaman Data & metode, bagian Ganti data. Unggah GeoJSON lengkap, atau CSV (`id;nama;kecamatan;laju;sigma;n_piksel;koherensi`) yang digabung ke batas kelurahan. Templat CSV bisa diunduh di sana. Data unggahan hanya hidup di peramban.
-2. **Permanen:** ganti `public/data/semarang-kawasan.geojson` dengan file berskema sama, set `metadata.jenis` menjadi `olahan`.
-3. **Dari MintPy:** sketsa awal di bawah. **Belum pernah dijalankan**, sesuaikan nama file dan ambang.
+1. **Lewat aplikasi:** halaman Data & metode, bagian Unggah data. Unggah GeoJSON lengkap, atau CSV (`id;nama;kecamatan;laju;sigma;n_piksel;koherensi`) yang digabung ke batas kelurahan. Templat CSV bisa diunduh di sana. Data unggahan hanya hidup di peramban dan tidak membawa grid, jadi selama dipakai, peta dan laporan beralih ke rata-rata kelurahan.
+2. **Permanen:** ganti file grid dan `public/data/semarang-kawasan.geojson` dengan file berskema sama, set `jenis` menjadi `olahan`.
+3. **Dari MintPy:** sketsa awal untuk ringkasan kelurahan ada di bawah. **Belum pernah dijalankan**, sesuaikan nama file dan ambang. Pipeline lengkap (termasuk penulisan grid) sedang disiapkan di folder `pipeline/`.
 
 ```python
 import geopandas as gpd, json
@@ -137,7 +171,9 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 ## Asumsi yang belum ditetapkan tim
 
 - Ambang kategori 2 dan 4 cm/tahun.
-- Unit laporan kelurahan (bukan grid 250 m).
+- Unit laporan: blok 3 × 3 piksel (sekitar 240 m) di sekitar titik, memadai bila minimal 4 piksel terukur.
+- Ketidakpastian titik = akar dari (sebaran laju dalam blok² + galat ukur piksel²).
+- Ringkasan kelurahan memadai bila minimal 15 piksel terukur dan menutup minimal 20% luasnya.
 - Bila hanya satu lintasan satelit: asumsi gerak dominan vertikal.
 - Model data demo (pola utara-timur makin cepat) hanya ilustrasi.
 - Pilihan teknologi: MapLibre GL JS, peta dasar OpenFreeMap, Nominatim.
@@ -161,7 +197,7 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 
 ## Batasan produk
 
-- Laporan bersifat kawasan (kelurahan), bukan per bangunan.
+- Laporan menggambarkan blok sekitar 240 m di sekitar titik, bukan satu bangunan. Dashboard dan data unggahan bersifat per kelurahan.
 - Kategori bukan jaminan bahwa suatu rumah aman atau tidak aman.
 - Tidak menggantikan pemeriksaan legalitas tanah, survei geoteknik, penilaian bangunan, atau prosedur pembiayaan resmi.
 - Proyeksi adalah perpanjangan tren masa lalu. Selalu dibaca "jika tren bertahan".

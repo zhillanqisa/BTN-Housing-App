@@ -1,9 +1,12 @@
-// State aplikasi (zustand). Satu sumber kebenaran untuk dataset, pilihan lokasi,
+// State aplikasi (zustand). Satu sumber kebenaran untuk dataset, grid piksel, pilihan lokasi,
 // tenor, ambang kategori, daftar banding, dan tampilan peta.
+import { useMemo } from 'react'
 import { create } from 'zustand'
-import { DEFAULT_TENOR, DEFAULT_THRESHOLDS, MAKS_BANDING, THRESHOLD_LIMITS } from './config'
+import { DEFAULT_TENOR, DEFAULT_THRESHOLDS, GRID_URL, MAKS_BANDING, THRESHOLD_LIMITS } from './config'
 import { ambilDatasetDemo, cariKawasanDiTitik, indeksKawasan } from './data'
-import type { AsalPilihan, Dataset, DatasetMeta, Kawasan, ModePeta, Position, Selection, Tema, Tenor, Thresholds } from './types'
+import { ambilDeret, ambilGrid, type Grid } from './grid'
+import { bacaLokasi, kunciTitik, LABEL_TITIK, type Bacaan } from './lokasi'
+import type { AsalPilihan, Dataset, DatasetMeta, Kawasan, ModePeta, Position, Selection, Tema, Tenor, Thresholds, TitikBanding } from './types'
 
 let indeks = new Map<string, Kawasan>()
 
@@ -34,26 +37,30 @@ export interface AppState {
   galat: string | null
   meta: DatasetMeta | null
   kawasan: Kawasan[]
+  /** Grid piksel. null = data tanpa grid (mis. unggahan per kelurahan): laporan memakai rata-rata kelurahan. */
+  grid: Grid | null
   /** Naik setiap dataset diganti; dipakai peta untuk setData. */
   versiData: number
+  /** Naik saat grid diganti atau deret waktunya selesai dimuat. */
+  versiGrid: number
   thresholds: Thresholds
   tenor: Tenor
   selection: Selection | null
-  /** id kawasan yang dibandingkan (maks 3) */
-  banding: string[]
+  /** Titik yang dibandingkan (maks MAKS_BANDING) */
+  banding: TitikBanding[]
   tema: Tema
   modePeta: ModePeta
   tigaD: boolean
 
   muatDemo: () => Promise<void>
-  pakaiDataset: (ds: Dataset) => void
+  pakaiDataset: (ds: Dataset, grid?: Grid | null) => void
   pilihTitik: (lngLat: Position, asal: AsalPilihan, label?: string) => void
   pilihKawasan: (id: string, asal: AsalPilihan) => void
   tutupLaporan: () => void
   setTenor: (t: Tenor) => void
   setThresholds: (t: Thresholds) => void
   resetThresholds: () => void
-  toggleBanding: (id: string) => void
+  toggleBanding: (t: TitikBanding) => void
   kosongkanBanding: () => void
   setTema: (t: Tema) => void
   setModePeta: (m: ModePeta) => void
@@ -65,7 +72,9 @@ export const useApp = create<AppState>()((set, get) => ({
   galat: null,
   meta: null,
   kawasan: [],
+  grid: null,
   versiData: 0,
+  versiGrid: 0,
   thresholds: DEFAULT_THRESHOLDS,
   tenor: DEFAULT_TENOR,
   selection: null,
@@ -77,13 +86,20 @@ export const useApp = create<AppState>()((set, get) => ({
   muatDemo: async () => {
     set({ status: 'memuat', galat: null })
     try {
-      get().pakaiDataset(await ambilDatasetDemo())
+      const [ds, grid] = await Promise.all([ambilDatasetDemo(), ambilGrid(GRID_URL)])
+      get().pakaiDataset(ds, grid)
+      // deret waktu adalah file terbesar: dimuat setelah peta dan laju tampil
+      if (grid) {
+        void ambilDeret(grid, GRID_URL).then((ok) => {
+          if (ok && get().grid === grid) set((s) => ({ versiGrid: s.versiGrid + 1 }))
+        })
+      }
     } catch (e) {
       set({ status: 'gagal', galat: e instanceof Error ? e.message : 'Gagal memuat data.' })
     }
   },
 
-  pakaiDataset: (ds) => {
+  pakaiDataset: (ds, grid = null) => {
     const kawasan = indeksKawasan(ds)
     indeks = new Map(kawasan.map((k) => [k.id, k]))
     const sel = get().selection
@@ -93,21 +109,28 @@ export const useApp = create<AppState>()((set, get) => ({
       galat: null,
       meta: ds.metadata,
       kawasan,
+      grid,
       versiData: s.versiData + 1,
-      banding: s.banding.filter((id) => indeks.has(id)),
+      versiGrid: s.versiGrid + 1,
+      banding: s.banding.filter((t) => cariKawasanDiTitik(t.lngLat, kawasan)),
       selection: sel ? { ...sel, kawasanId: k?.id ?? null } : null,
     }))
   },
 
   pilihTitik: (lngLat, asal, label) => {
-    const k = cariKawasanDiTitik(lngLat, get().kawasan)
-    set({ selection: { lngLat, kawasanId: k?.id ?? null, label: label ?? (k ? `Kelurahan ${k.nama}` : 'Titik pilihan'), asal } })
+    const { kawasan, grid } = get()
+    const k = cariKawasanDiTitik(lngLat, kawasan)
+    // tanpa grid, angka yang tampil adalah rata-rata kelurahan: beri nama kelurahannya
+    const bawaan = !grid && k ? `Kelurahan ${k.nama}` : LABEL_TITIK
+    set({ selection: { lngLat, kawasanId: k?.id ?? null, label: label?.trim() || bawaan, asal } })
   },
 
   pilihKawasan: (id, asal) => {
     const k = kawasanById(id)
     if (!k) return
-    set({ selection: { lngLat: k.pusat, kawasanId: k.id, label: `Kelurahan ${k.nama}`, asal } })
+    // dengan grid, yang dibaca adalah blok piksel di pusat kelurahan, bukan rata-rata kelurahan
+    const label = get().grid ? `Pusat Kelurahan ${k.nama}` : `Kelurahan ${k.nama}`
+    set({ selection: { lngLat: k.pusat, kawasanId: k.id, label, asal } })
   },
 
   tutupLaporan: () => set({ selection: null }),
@@ -115,11 +138,12 @@ export const useApp = create<AppState>()((set, get) => ({
   setThresholds: (t) => set({ thresholds: rapikanAmbang(t) }),
   resetThresholds: () => set({ thresholds: DEFAULT_THRESHOLDS }),
 
-  toggleBanding: (id) =>
+  toggleBanding: (t) =>
     set((s) => {
-      if (s.banding.includes(id)) return { banding: s.banding.filter((x) => x !== id) }
-      if (s.banding.length >= MAKS_BANDING || !indeks.has(id)) return s
-      return { banding: [...s.banding, id] }
+      const kunci = kunciTitik(t.lngLat)
+      if (s.banding.some((x) => kunciTitik(x.lngLat) === kunci)) return { banding: s.banding.filter((x) => kunciTitik(x.lngLat) !== kunci) }
+      if (s.banding.length >= MAKS_BANDING || !cariKawasanDiTitik(t.lngLat, s.kawasan)) return s
+      return { banding: [...s.banding, { lngLat: t.lngLat, label: t.label }] }
     }),
   kosongkanBanding: () => set({ banding: [] }),
 
@@ -138,9 +162,16 @@ export const useApp = create<AppState>()((set, get) => ({
   setTigaD: (tigaD) => set({ tigaD }),
 }))
 
-/** Hook: kawasan berdasarkan id (re-render saat dataset diganti). */
-export function useKawasan(id: string | null | undefined): Kawasan | null {
-  return useApp((s) => (id ? (s.kawasan.find((k) => k.id === id) ?? null) : null))
+/** Hook: bacaan untuk satu titik (blok piksel bila ada grid, kelurahan bila tidak). null = di luar wilayah. */
+export function useBacaan(lngLat: Position | null | undefined): Bacaan | null {
+  const kawasan = useApp((s) => s.kawasan)
+  const grid = useApp((s) => s.grid)
+  const versiGrid = useApp((s) => s.versiGrid)
+  const lon = lngLat?.[0]
+  const lat = lngLat?.[1]
+  // versiGrid ikut jadi kunci: deret waktu dipasang ke objek grid yang sama setelah selesai dimuat
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => (lon == null || lat == null ? null : bacaLokasi([lon, lat], kawasan, grid)), [lon, lat, kawasan, grid, versiGrid])
 }
 
 /** Jembatan non-reaktif ke peta: gambar untuk PDF dan perintah kamera dari tombol kontrol. */

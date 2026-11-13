@@ -1,5 +1,6 @@
 // Shell aplikasi: peta selalu terpasang di belakang; halaman lain menutupinya.
-// Sinkron dua arah antara pilihan lokasi/tenor dan tautan (#/?k=<id>&t=<tenor>).
+// Sinkron dua arah antara pilihan lokasi/tenor dan tautan (#/?ll=<lintang>,<bujur>&t=<tenor>).
+// Tautan lama #/?k=<id kelurahan> tetap dibaca dan diarahkan ke pusat kelurahan itu.
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ArrowClockwise, FileText, ListChecks, MagnifyingGlass } from '@phosphor-icons/react'
 import MapChrome from './components/MapChrome'
@@ -9,6 +10,7 @@ import SearchBox from './components/SearchBox'
 import Sorotan from './components/Sorotan'
 import TopBar from './components/TopBar'
 import { DEFAULT_TENOR, TENORS } from './lib/config'
+import { LABEL_TITIK } from './lib/lokasi'
 import { navigasi, useRute } from './lib/router'
 import { useApp } from './lib/store'
 import type { Tenor } from './lib/types'
@@ -22,11 +24,14 @@ function Intro() {
   const status = useApp((s) => s.status)
   const galat = useApp((s) => s.galat)
   const jenis = useApp((s) => s.meta?.jenis)
+  const titik = useApp((s) => !!s.grid)
   const muatDemo = useApp((s) => s.muatDemo)
   return (
     <Panel className="pa-enter p-5">
       <h1 className="text-[27px] font-bold leading-[1.12] tracking-tight text-ink">Cek tanah sebelum KPR</h1>
-      <p className="mt-2 text-[14px] leading-relaxed text-ink-2">Pilih lokasi rumah incaran. Lihat laju penurunan tanah kawasannya dan proyeksinya selama masa cicilan.</p>
+      <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
+        Pilih lokasi rumah incaran. Lihat laju penurunan tanah {titik ? 'di sekitar titik itu' : 'kawasannya'} dan proyeksinya selama masa cicilan.
+      </p>
       {status === 'memuat' && <Skeleton className="mt-4 h-24 w-full" />}
       {status === 'gagal' && (
         <div className="mt-4 space-y-2">
@@ -44,7 +49,7 @@ function Intro() {
           </li>
           <li className="flex items-center gap-3">
             <FileText size={18} className="shrink-0 text-ink-3" aria-hidden="true" />
-            Baca Laporan Ambles untuk kawasan itu.
+            Baca Laporan Ambles untuk {titik ? 'titik' : 'kawasan'} itu.
           </li>
           <li className="flex items-center gap-3">
             <ListChecks size={18} className="shrink-0 text-ink-3" aria-hidden="true" />
@@ -114,6 +119,7 @@ export default function App() {
   const status = useApp((s) => s.status)
   const selection = useApp((s) => s.selection)
   const tenor = useApp((s) => s.tenor)
+  const adaGrid = useApp((s) => !!s.grid)
   const sudahBaca = useRef(false)
 
   useEffect(() => {
@@ -135,7 +141,9 @@ export default function App() {
       if (k !== s.selection?.kawasanId) s.pilihKawasan(k, 'tautan')
     } else if (ll && !s.selection) {
       const [lat, lon] = ll.split(',').map(Number)
-      if (Number.isFinite(lat) && Number.isFinite(lon)) s.pilihTitik([lon!, lat!], 'tautan')
+      // n = nama lokasi dari tautan; hanya ditampilkan sebagai teks
+      const nama = rute.params.get('n')?.slice(0, 60)
+      if (Number.isFinite(lat) && Number.isFinite(lon)) s.pilihTitik([lon!, lat!], 'tautan', nama || undefined)
     }
   }, [rute, status, halaman])
 
@@ -144,16 +152,19 @@ export default function App() {
     if (status !== 'siap' || halaman !== 'peta' || !sudahBaca.current) return
     const s = useApp.getState()
     const sel = s.selection
+    // dengan grid, laporan bergantung pada titiknya, jadi tautan menyimpan koordinat
+    const pakaiTitik = !!sel && (adaGrid || !sel.kawasanId)
     navigasi(
       'peta',
       {
-        k: sel?.kawasanId,
-        ll: sel && !sel.kawasanId ? `${sel.lngLat[1].toFixed(5)},${sel.lngLat[0].toFixed(5)}` : null,
+        k: sel && !pakaiTitik ? sel.kawasanId : null,
+        ll: sel && pakaiTitik ? `${sel.lngLat[1].toFixed(5)},${sel.lngLat[0].toFixed(5)}` : null,
+        n: sel && pakaiTitik && sel.label !== LABEL_TITIK ? sel.label.slice(0, 60) : null,
         t: s.tenor !== DEFAULT_TENOR ? s.tenor : null,
       },
       true,
     )
-  }, [selection, tenor, status, halaman])
+  }, [selection, tenor, status, halaman, adaGrid])
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-bg text-ink">

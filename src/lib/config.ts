@@ -63,11 +63,26 @@ export const NOMINATIM = {
 } as const
 
 export const DATA_URL = `${import.meta.env.BASE_URL}data/semarang-kawasan.geojson`
+export const GRID_URL = `${import.meta.env.BASE_URL}data/semarang-grid.json`
 export const MAKS_BANDING = 3
 
-/** Batasan produk. Wajib tampil di laporan, PDF, dan halaman metode. */
-export const BATASAN: string[] = [
-  'Laporan ini bersifat kawasan (kelurahan), bukan per bangunan.',
+/** ASUMSI: laporan titik dihitung dari blok BLOK_PIKSEL x BLOK_PIKSEL piksel di sekitar titik
+ *  (3 x 80 m = sekitar 240 m) dan dianggap memadai bila minimal MIN_PIKSEL_BLOK piksel terukur. */
+export const BLOK_PIKSEL = 3
+export const MIN_PIKSEL_BLOK = 4
+
+/** Batasan produk. Wajib tampil di laporan, PDF, dan halaman metode.
+ *  titik=true: angka dari blok piksel di sekitar titik; false: rata-rata kelurahan. */
+export function batasan(titik: boolean, lebarBlokM = 240): string[] {
+  return [
+    titik
+      ? `Laporan ini menggambarkan blok sekitar ${lebarBlokM} m di sekitar titik, bukan satu bangunan.`
+      : 'Laporan ini bersifat kawasan (kelurahan), bukan per bangunan.',
+    ...BATASAN_UMUM,
+  ]
+}
+
+const BATASAN_UMUM: string[] = [
   'Kategori bukan jaminan bahwa suatu rumah aman atau tidak aman.',
   'Tidak menggantikan pemeriksaan legalitas tanah, survei geoteknik, penilaian bangunan, atau prosedur pembiayaan resmi.',
   'Proyeksi adalah perpanjangan tren masa lalu. Tren bisa berubah, jadi selalu dibaca "jika tren bertahan".',
