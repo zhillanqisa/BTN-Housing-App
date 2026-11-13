@@ -35,6 +35,22 @@ TOLERANSI_TAHUNAN = 24  # hari
 TAHUNAN_TIAP = 2  # satu pasangan tahunan untuk tiap N citra
 
 
+# Produk HyP3 untuk Semarang: UTM zona 49 Selatan, piksel 80 m, grid sejajar pada kelipatan 80 m.
+EPSG_UTM = 32749
+PIKSEL_M = 80
+BANTALAN_M = 1000  # ruang di luar kotak batas kota saat memotong
+
+# Stasiun GNSS CSEM (Susilo dkk. 2023): stabil, dipakai sebagai titik referensi.
+CSEM_LALO = (-6.9872694696, 110.3769383426)
+
+
 def pastikan_kerja() -> Path:
     KERJA.mkdir(parents=True, exist_ok=True)
     return KERJA
+
+
+def dir_lintasan(lintasan: str) -> Path:
+    """Folder kerja satu lintasan: hyp3/<produk>/ (interferogram), geom/ (geometri), mintpy/."""
+    d = KERJA / lintasan
+    d.mkdir(parents=True, exist_ok=True)
+    return d

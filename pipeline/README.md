@@ -10,12 +10,22 @@ Alur: katalog ASF, interferogram di ASF HyP3, deret waktu SBAS di MintPy, gabung
 |---|---|---|
 | 1. Cari burst dan susun pasangan SBAS | `01_cari_pasangan.py` | Siap, tidak butuh login |
 | 2. Pesan interferogram ke HyP3 | `02_pesan_hyp3.py` | Siap, butuh akun Earthdata dengan akses HyP3 |
-| 3. Unduh dan potong ke wilayah kota | belum ditulis | Ditulis setelah uji kecil menghasilkan produk nyata |
-| 4. Deret waktu MintPy per lintasan | belum ditulis | Sama |
-| 5. Gerak vertikal dan validasi | belum ditulis | Sama |
+| 3. Unduh dan potong ke wilayah kota | `03_unduh_potong.py` | Siap, diuji dengan 10 produk |
+| 4. Deret waktu MintPy per lintasan | `04_mintpy.py` | Diuji sampai langkah titik referensi dengan 5 pasangan. Inversi penuh belum pernah jalan |
+| 5. Gerak vertikal dan validasi | belum ditulis | Ditulis setelah keluaran MintPy penuh tersedia |
 | 6. Ekspor grid dan ringkasan kelurahan | belum ditulis | Sama |
 
-Langkah 3 sampai 6 sengaja belum ditulis: susunan file produk HyP3 multi-burst dan keluaran MintPy harus dilihat dulu dari hasil nyata, supaya skripnya tidak menebak.
+`status_hyp3.py` menampilkan status job di HyP3 dan sisa kredit.
+
+Langkah 5 dan 6 sengaja belum ditulis: keluaran MintPy harus dilihat dulu dari hasil nyata, supaya skripnya tidak menebak.
+
+Catatan dari uji kecil (14 November 2026):
+
+- Produk HyP3 berada di UTM zona 49 Selatan, piksel 80 m, dan semua grid sejajar pada kelipatan 80 m. Pemotongan hanya menyalin piksel, tanpa resampling.
+- Kotak potong kota 360 x 284 piksel. Satu produk terpotong sekitar 0,8 MB.
+- Citra Sentinel-1B, 1C, dan 1D ikut terproses tanpa masalah.
+- Koherensi median di kotak kota 0,57 sampai 0,93, dan 92 sampai 100% piksel darat terisi.
+- Produk HyP3 hanya disimpan 14 hari. Jalankan langkah 3 sebelum itu.
 
 ## Persiapan
 
@@ -45,6 +55,9 @@ python pipeline/01_cari_pasangan.py --lintasan asc
 python pipeline/02_pesan_hyp3.py --lintasan desc
 python pipeline/02_pesan_hyp3.py --lintasan desc --uji 5 --kirim
 python pipeline/02_pesan_hyp3.py --lintasan desc --kirim
+python pipeline/status_hyp3.py
+python pipeline/03_unduh_potong.py --lintasan desc
+python pipeline/04_mintpy.py --lintasan desc
 ```
 
 `02_pesan_hyp3.py` tanpa `--kirim` hanya memeriksa akses, sisa kredit, dan biaya. Dengan `--kirim` barulah memesan. Aman diulang: pasangan yang sudah dipesan tidak dipesan lagi.
