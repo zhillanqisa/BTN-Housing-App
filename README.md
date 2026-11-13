@@ -2,6 +2,8 @@
 
 **Cek Tanah Sebelum KPR.** Web app untuk melihat laju penurunan tanah per kelurahan di Kota Semarang dan proyeksinya selama masa cicilan KPR (Proyeksi Tenor). Dibuat untuk BTN Housingpreneur Batch 3, kategori Housing Innovation.
 
+**Demo:** https://zhillanqisa.github.io/BTN-Housing-App/
+
 > **Status data:** peta saat ini memakai **data demo ilustratif**, bukan hasil pengukuran. Pola angkanya meniru rentang publikasi supaya antarmuka bisa didemokan. Olahan Sentinel-1 tim belum dijalankan. Jangan memakai angka di aplikasi ini untuk keputusan.
 
 ## Menjalankan
@@ -14,9 +16,10 @@ npm run dev        # http://localhost:5173
 npm test           # tes unit
 npm run build      # typecheck + build ke dist/
 npm run preview    # menyajikan dist/
+npm run deploy     # build lalu terbitkan dist/ ke cabang gh-pages (GitHub Pages)
 ```
 
-Hasil `dist/` berupa file statis dan bisa di-host gratis (GitHub Pages, Netlify, Vercel). Aplikasi butuh internet untuk peta dasar dan pencarian alamat. Tanpa internet, data kawasan tetap tampil di atas latar polos.
+Hasil `dist/` berupa file statis dan bisa di-host gratis (GitHub Pages, Netlify, Vercel). Untuk GitHub Pages: di repo buka Settings, Pages, pilih Source "Deploy from a branch", lalu Branch `gh-pages` dan folder `/ (root)`. Setelah itu cukup jalankan `npm run deploy` tiap kali ingin memperbarui situs. Aplikasi butuh internet untuk peta dasar dan pencarian alamat. Tanpa internet, data kawasan tetap tampil di atas latar polos.
 
 ## Alur demo yang disarankan
 
