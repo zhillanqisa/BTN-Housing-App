@@ -1,0 +1,209 @@
+// Komponen UI dasar. Dipakai semua halaman supaya tampilan konsisten.
+// Aturan bentuk: panel 22px, kontrol 12px, pil/chip bulat penuh.
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { Info, Warning } from '@phosphor-icons/react'
+import { LABEL_KATEGORI } from '../lib/config'
+import type { Kategori } from '../lib/types'
+
+export function cx(...a: (string | false | null | undefined)[]): string {
+  return a.filter(Boolean).join(' ')
+}
+
+/** Tanda merek: dua bilah yang turun satu tingkat (muka tanah sebelum dan sesudah). */
+export function Logo({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="9" fill="#16161d" />
+      <rect x="7" y="10" width="10" height="4" rx="2" fill="#f2f2f6" />
+      <rect x="15" y="18" width="10" height="4" rx="2" fill="#c6f135" />
+    </svg>
+  )
+}
+
+type Varian = 'primary' | 'accent' | 'secondary' | 'ghost'
+const VARIAN: Record<Varian, string> = {
+  primary: 'bg-ink text-surface hover:opacity-90',
+  accent: 'bg-accent text-accent-ink hover:brightness-95',
+  secondary: 'border border-line-2 bg-surface text-ink hover:bg-surface-2',
+  ghost: 'text-ink-2 hover:bg-surface-2 hover:text-ink',
+}
+const DASAR_TOMBOL =
+  'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[12px] font-semibold transition-[transform,background-color,opacity,filter] duration-200 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45'
+
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  varian?: Varian
+  ukuran?: 'sm' | 'md'
+  ikon?: ReactNode
+}
+
+export function Button({ varian = 'secondary', ukuran = 'md', ikon, className, children, type = 'button', ...rest }: ButtonProps) {
+  return (
+    <button
+      type={type}
+      className={cx(DASAR_TOMBOL, VARIAN[varian], ukuran === 'sm' ? 'h-9 px-3 text-[13px]' : 'h-11 px-4 text-sm', className)}
+      {...rest}
+    >
+      {ikon}
+      {children}
+    </button>
+  )
+}
+
+interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'> {
+  label: string
+  varian?: Varian
+  aktif?: boolean
+}
+
+export function IconButton({ label, varian = 'ghost', aktif, className, children, type = 'button', ...rest }: IconButtonProps) {
+  return (
+    <button
+      type={type}
+      aria-label={label}
+      title={label}
+      aria-pressed={aktif}
+      className={cx(DASAR_TOMBOL, 'size-10', aktif ? 'bg-ink text-surface' : VARIAN[varian], className)}
+      {...rest}
+    >
+      {children}
+    </button>
+  )
+}
+
+interface SegmentedProps<T extends string | number> {
+  label: string
+  nilai: T
+  opsi: { nilai: T; label: string }[]
+  onUbah: (v: T) => void
+  ukuran?: 'sm' | 'md'
+  penuh?: boolean
+}
+
+/** Pilihan tunggal bersegmen (radiogroup). */
+export function Segmented<T extends string | number>({ label, nilai, opsi, onUbah, ukuran = 'md', penuh }: SegmentedProps<T>) {
+  return (
+    <div role="radiogroup" aria-label={label} className={cx('inline-flex gap-1 rounded-[12px] bg-surface-2 p-1', penuh && 'flex w-full')}>
+      {opsi.map((o) => {
+        const aktif = o.nilai === nilai
+        return (
+          <button
+            key={String(o.nilai)}
+            type="button"
+            role="radio"
+            aria-checked={aktif}
+            onClick={() => onUbah(o.nilai)}
+            className={cx(
+              'rounded-[9px] font-semibold transition-colors duration-200',
+              ukuran === 'sm' ? 'h-7 px-2.5 text-[12.5px]' : 'h-9 px-3.5 text-[13.5px]',
+              penuh && 'flex-1',
+              aktif ? 'bg-ink text-surface' : 'text-ink-2 hover:text-ink',
+            )}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+export function Chip({ className, children, type = 'button', ...rest }: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type={type}
+      className={cx(
+        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-line-2 bg-surface px-3 text-[13px] font-medium text-ink-2 transition-colors duration-200 hover:border-ink-3 hover:text-ink active:scale-[0.98]',
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function warnaKategori(k: Kategori): string {
+  return k === 'tidak-memadai' ? 'var(--nodata)' : `var(--kat-${k})`
+}
+
+/** Kotak warna kategori. "Data tidak memadai" memakai arsir, bukan warna saja. */
+export function Swatch({ kategori, className }: { kategori: Kategori; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cx('inline-block size-3 shrink-0 rounded-[4px]', kategori === 'tidak-memadai' && 'hatch', className)}
+      style={kategori === 'tidak-memadai' ? undefined : { background: warnaKategori(kategori) }}
+    />
+  )
+}
+
+/** Label kategori: selalu warna + teks, tidak pernah warna saja. */
+export function KategoriBadge({ kategori, className }: { kategori: Kategori; className?: string }) {
+  return (
+    <span className={cx('inline-flex h-7 items-center gap-2 rounded-full bg-surface-2 pl-2.5 pr-3 text-[12.5px] font-semibold text-ink', className)}>
+      <Swatch kategori={kategori} />
+      {LABEL_KATEGORI[kategori]}
+    </span>
+  )
+}
+
+export function Panel({ className, children, ...rest }: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <section className={cx('glass rounded-[22px]', className)} {...rest}>
+      {children}
+    </section>
+  )
+}
+
+/** Kartu polos untuk halaman non-peta. */
+export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cx('rounded-[22px] border border-line bg-surface', className)} {...rest}>
+      {children}
+    </div>
+  )
+}
+
+export function Stat({ label, nilai, satuan, catatan }: { label: string; nilai: ReactNode; satuan?: string; catatan?: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[12.5px] font-medium text-ink-3">{label}</div>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="text-[28px] font-bold leading-none tracking-tight text-ink">{nilai}</span>
+        {satuan && <span className="text-[13px] font-medium text-ink-3">{satuan}</span>}
+      </div>
+      {catatan && <div className="mt-1.5 text-[12.5px] text-ink-2">{catatan}</div>}
+    </div>
+  )
+}
+
+export function JudulBagian({ children, kanan }: { children: ReactNode; kanan?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <h3 className="text-[13px] font-semibold text-ink-2">{children}</h3>
+      {kanan}
+    </div>
+  )
+}
+
+/** Catatan penting. nada "demo" dipakai untuk penanda data ilustratif. */
+export function Notice({ nada = 'info', children, className }: { nada?: 'demo' | 'info'; children: ReactNode; className?: string }) {
+  if (nada === 'demo') {
+    return (
+      <div role="note" className={cx('flex gap-2.5 rounded-[12px] border border-notice-line bg-notice-bg px-3 py-2.5 text-[12.5px] leading-snug text-notice-ink', className)}>
+        <Warning size={16} weight="fill" className="mt-px shrink-0" aria-hidden="true" />
+        <div>{children}</div>
+      </div>
+    )
+  }
+  return (
+    <div role="note" className={cx('flex gap-2.5 rounded-[12px] bg-surface-2 px-3 py-2.5 text-[12.5px] leading-snug text-ink-2', className)}>
+      <Info size={16} className="mt-px shrink-0" aria-hidden="true" />
+      <div>{children}</div>
+    </div>
+  )
+}
+
+export function Skeleton({ className }: { className?: string }) {
+  return <div aria-hidden="true" className={cx('animate-pulse rounded-[10px] bg-surface-2', className)} />
+}

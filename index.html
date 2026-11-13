@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="PANTAU AMBLES: cek laju penurunan tanah di kawasan rumah incaran dan lihat proyeksinya selama masa cicilan KPR. Wilayah uji: Kota Semarang."
+    />
+    <meta name="theme-color" content="#f3f3f6" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>PANTAU AMBLES | Cek Tanah Sebelum KPR</title>
+    <script>
+      // Set tema sebelum render pertama supaya tidak berkedip.
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem('pa-tema');
+        } catch (e) {}
+        if (t !== 'light' && t !== 'dark') {
+          t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
