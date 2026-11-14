@@ -42,6 +42,8 @@ BANTALAN_M = 1000  # ruang di luar kotak batas kota saat memotong
 
 # Stasiun GNSS CSEM (Susilo dkk. 2023): stabil, dipakai sebagai titik referensi.
 CSEM_LALO = (-6.9872694696, 110.3769383426)
+# Laju turun CSEM dari deret harian 2010 sampai 2021 (cm/tahun, positif = turun).
+CSEM_LAJU_TURUN_CM = 0.07
 
 
 def pastikan_kerja() -> Path:

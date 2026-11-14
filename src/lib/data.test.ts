@@ -100,9 +100,8 @@ describe('file data bawaan', () => {
     }
   })
   it('kawasan tidak memadai tidak membawa angka', () => {
-    const tak = kawasan.filter((x) => !x.memadai)
-    expect(tak.length).toBeGreaterThan(0)
-    for (const k of tak) {
+    // pada data olahan bisa saja semua kelurahan memadai; aturannya tetap berlaku bila ada yang tidak
+    for (const k of kawasan.filter((x) => !x.memadai)) {
       expect(k.laju).toBeNull()
       expect(k.deret).toHaveLength(0)
     }
@@ -153,7 +152,8 @@ describe('impor', () => {
 
 describe('PDF Laporan Ambles', () => {
   const buat = async (nama: string, memadai: boolean) => {
-    const k = kawasan.find((x) => (memadai ? x.nama === nama : !x.memadai))!
+    // kawasan tanpa data dibuat sendiri: file data bawaan belum tentu punya satu
+    const k = memadai ? kawasan.find((x) => x.nama === nama)! : { ...kawasan[0]!, memadai: false, laju: null, sigma: null, sebaran: null, nPiksel: 0, deret: [] }
     const kategori = klasifikasi(k.laju, k.memadai, { sedang: 2, tinggi: 4 })
     const blob = await buatLaporanPdf({ kawasan: k, kategori, tenor: 15, thresholds: { sedang: 2, tinggi: 4 }, meta: asli.dataset.metadata, label: nama, lngLat: k.pusat, gambarPeta: null })
     return { blob, teks: new TextDecoder('latin1').decode(await blob.arrayBuffer()) }

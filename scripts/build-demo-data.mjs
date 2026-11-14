@@ -153,6 +153,18 @@ const AMBANG_KOHERENSI = 0.42
 const MIN_PIKSEL = 15
 const MIN_CAKUPAN = 0.2
 
+// ---------- pengaman ----------
+// Skrip ini menulis ke folder yang sama dengan hasil olah asli. Jangan menimpanya tanpa sengaja.
+try {
+  const lama = JSON.parse(await readFile(path.join(OUT_DIR, 'semarang-kawasan.geojson'), 'utf8'))
+  if (lama?.metadata?.jenis === 'olahan' && !process.argv.includes('--paksa')) {
+    console.error('public/data berisi hasil olah asli (jenis "olahan"). Data demo tidak ditulis. Tambahkan --paksa bila memang ingin menimpanya.')
+    process.exit(1)
+  }
+} catch (e) {
+  if (e.code !== 'ENOENT') throw e
+}
+
 // ---------- masukan ----------
 const rawKel = await readFile(path.join(RAW, 'semarang-kelurahan.geojson'), 'utf8')
 const kota = JSON.parse(await readFile(path.join(RAW, 'semarang-kota.geojson'), 'utf8')).features[0]

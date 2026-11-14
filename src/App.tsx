@@ -10,10 +10,10 @@ import SearchBox from './components/SearchBox'
 import Sorotan from './components/Sorotan'
 import TopBar from './components/TopBar'
 import { DEFAULT_TENOR, TENORS } from './lib/config'
-import { LABEL_TITIK } from './lib/lokasi'
+import { kunciTitik, LABEL_TITIK } from './lib/lokasi'
 import { navigasi, useRute } from './lib/router'
 import { useApp } from './lib/store'
-import type { Tenor } from './lib/types'
+import type { Position, Tenor } from './lib/types'
 import { Button, cx, Notice, Panel, Skeleton } from './ui/primitives'
 
 const DashboardView = lazy(() => import('./views/DashboardView'))
@@ -132,18 +132,29 @@ export default function App() {
     const s = useApp.getState()
     const k = rute.params.get('k')
     const ll = rute.params.get('ll')
-    if (!sudahBaca.current) {
-      sudahBaca.current = true
+    const bacaTenor = () => {
       const t = Number(rute.params.get('t'))
       if ((TENORS as number[]).includes(t)) s.setTenor(t as Tenor)
     }
+    if (!sudahBaca.current) {
+      sudahBaca.current = true
+      bacaTenor()
+    }
     if (k) {
       if (k !== s.selection?.kawasanId) s.pilihKawasan(k, 'tautan')
-    } else if (ll && !s.selection) {
+    } else if (ll) {
       const [lat, lon] = ll.split(',').map(Number)
-      // n = nama lokasi dari tautan; hanya ditampilkan sebagai teks
-      const nama = rute.params.get('n')?.slice(0, 60)
-      if (Number.isFinite(lat) && Number.isFinite(lon)) s.pilihTitik([lon!, lat!], 'tautan', nama || undefined)
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        const titik: Position = [lon!, lat!]
+        // Juga berlaku untuk tautan yang ditempel saat aplikasi sudah terbuka. Bila titiknya sama
+        // dengan pilihan sekarang, tautan itu tulisan aplikasi sendiri dan tidak perlu dibaca lagi.
+        if (!s.selection || kunciTitik(s.selection.lngLat) !== kunciTitik(titik)) {
+          // n = nama lokasi dari tautan; hanya ditampilkan sebagai teks
+          const nama = rute.params.get('n')?.slice(0, 60)
+          s.pilihTitik(titik, 'tautan', nama || undefined)
+          bacaTenor()
+        }
+      }
     }
   }, [rute, status, halaman])
 
