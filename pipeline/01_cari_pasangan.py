@@ -1,4 +1,6 @@
-"""Langkah 1: cari burst Sentinel-1 di atas Kota Semarang dan susun jaringan pasangan SBAS.
+"""Langkah 1: cari burst Sentinel-1 di atas wilayah dan susun jaringan pasangan SBAS.
+
+Wilayah dipilih lewat PA_WILAYAH (lihat umum.py).
 
 Tidak butuh login. Hanya membaca katalog publik ASF.
 
@@ -19,15 +21,17 @@ from collections import defaultdict
 from datetime import date, datetime
 
 import asf_search as asf
-from shapely.geometry import shape
+from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
-from umum import AOI_KOTA, HARI_TAHUNAN, LINTASAN, MULAI, TAHUNAN_TIAP, TETANGGA, TOLERANSI_TAHUNAN, pastikan_kerja
+from umum import AOI_KOTA, HARI_TAHUNAN, LINTASAN, MAKS_BURST, MULAI, TAHUNAN_TIAP, TETANGGA, TITIK_KOTAK, TOLERANSI_TAHUNAN, WILAYAH, pastikan_kerja
 
 
 def muat_kota():
+    """Batas wilayah, ditambah lingkaran kecil di titik ikat dan stasiun pembanding supaya ikut tertutup burst."""
     gj = json.loads(AOI_KOTA.read_text(encoding="utf-8"))
-    return unary_union([shape(f["geometry"]) for f in gj["features"]])
+    titik = [Point(lon, lat).buffer(0.01) for lat, lon in TITIK_KOTAK]
+    return unary_union([shape(f["geometry"]) for f in gj["features"]] + titik)
 
 
 def cari_burst(kota, arah: str, path: int, mulai: str, akhir: str):
@@ -44,7 +48,7 @@ def cari_burst(kota, arah: str, path: int, mulai: str, akhir: str):
     )
 
 
-def pilih_burst(produk, kota, min_tambahan: float):
+def pilih_burst(produk, kota, min_tambahan: float, maks: int = MAKS_BURST):
     """Pilih burst (fullBurstID) secara serakah: mulai dari yang paling menutup kota, lalu
     tambah burst lain hanya bila menambah cakupan. Burst yang cuma tumpang tindih dilewati,
     supaya jumlah burst per job (dan biaya kredit serta ukuran unduhan) sekecil mungkin."""
@@ -55,6 +59,8 @@ def pilih_burst(produk, kota, min_tambahan: float):
     terpilih: list[str] = []
     tertutup = None
     for b in sorted(cakupan, key=lambda x: -cakupan[x]):
+        if len(terpilih) >= maks:  # di atas 4 burst biaya HyP3 naik dari 1 ke 5 kredit per pasangan
+            break
         baru = tapak[b] if tertutup is None else tapak[b].difference(tertutup)
         if baru.area / kota.area >= min_tambahan:
             terpilih.append(b)
@@ -102,7 +108,7 @@ def main() -> None:
     ln = LINTASAN[a.lintasan]
     kota = muat_kota()
     produk = cari_burst(kota, ln["arah"], ln["path"], a.mulai, a.akhir)
-    print(f"Lintasan {a.lintasan} (path {ln['path']}, {ln['arah']}): {len(produk)} burst VV ditemukan, {a.mulai} s.d. {a.akhir}")
+    print(f"Wilayah {WILAYAH}, lintasan {a.lintasan} (path {ln['path']}, {ln['arah']}): {len(produk)} burst VV ditemukan, {a.mulai} s.d. {a.akhir}")
     if not produk:
         raise SystemExit("Tidak ada burst. Periksa koneksi atau parameter.")
 

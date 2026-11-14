@@ -1,17 +1,21 @@
 // Shell aplikasi: peta selalu terpasang di belakang; halaman lain menutupinya.
 // Sinkron dua arah antara pilihan lokasi/tenor dan tautan (#/?ll=<lintang>,<bujur>&t=<tenor>).
 // Tautan lama #/?k=<id kelurahan> tetap dibaca dan diarahkan ke pusat kelurahan itu.
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { ArrowClockwise, FileText, ListChecks, MagnifyingGlass } from '@phosphor-icons/react'
+import LaporanMobile from './components/LaporanMobile'
 import MapChrome from './components/MapChrome'
 import MapView from './components/MapView'
+import NavBawah from './components/NavBawah'
 import ReportPanel from './components/ReportPanel'
 import SearchBox from './components/SearchBox'
 import Sorotan from './components/Sorotan'
 import TopBar from './components/TopBar'
 import { DEFAULT_TENOR, TENORS } from './lib/config'
+import { useLayarKecil } from './lib/layar'
 import { kunciTitik, LABEL_TITIK } from './lib/lokasi'
-import { navigasi, useRute } from './lib/router'
+import { bacaRute, navigasi, useRute } from './lib/router'
+import { adalahIdWilayah, DAFTAR_WILAYAH, wilayahById, wilayahDiTitik } from './lib/wilayah'
 import { useApp } from './lib/store'
 import type { Position, Tenor } from './lib/types'
 import { Button, cx, Notice, Panel, Skeleton } from './ui/primitives'
@@ -26,12 +30,30 @@ function Intro() {
   const jenis = useApp((s) => s.meta?.jenis)
   const titik = useApp((s) => !!s.grid)
   const muatDemo = useApp((s) => s.muatDemo)
+  const wilayah = useApp((s) => s.wilayah)
+  const pilihWilayah = useApp((s) => s.pilihWilayah)
   return (
     <Panel className="pa-enter p-5">
       <h1 className="text-[27px] font-bold leading-[1.12] tracking-tight text-ink">Cek tanah sebelum KPR</h1>
       <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
-        Pilih lokasi rumah incaran. Lihat laju penurunan tanah {titik ? 'di sekitar titik itu' : 'kawasannya'} dan proyeksinya selama masa cicilan.
+        Pilih lokasi rumah incaran di {wilayahById(wilayah)?.nama}. Lihat laju penurunan tanah {titik ? 'di sekitar titik itu' : 'kawasannya'} dan proyeksinya selama masa cicilan.
       </p>
+      <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Pilih wilayah">
+        {DAFTAR_WILAYAH.map((w) => (
+          <button
+            key={w.id}
+            type="button"
+            aria-pressed={w.id === wilayah}
+            onClick={() => void pilihWilayah(w.id)}
+            className={cx(
+              'h-8 rounded-full border px-3 text-[12.5px] font-semibold transition-colors',
+              w.id === wilayah ? 'border-transparent bg-ink text-surface' : 'border-line-2 text-ink-2 hover:border-ink-3 hover:text-ink',
+            )}
+          >
+            {w.singkat}
+          </button>
+        ))}
+      </div>
       {status === 'memuat' && <Skeleton className="mt-4 h-24 w-full" />}
       {status === 'gagal' && (
         <div className="mt-4 space-y-2">
@@ -69,9 +91,28 @@ function Intro() {
   )
 }
 
+/** Di layar kecil Intro tidak tampil, jadi galat muat data perlu tempat sendiri. */
+function StatusMobile() {
+  const status = useApp((s) => s.status)
+  const galat = useApp((s) => s.galat)
+  const muatDemo = useApp((s) => s.muatDemo)
+  const selection = useApp((s) => s.selection)
+  if (status !== 'gagal' || selection) return null
+  return (
+    <div className="absolute inset-x-3 bottom-[calc(84px+env(safe-area-inset-bottom))] z-[12] lg:hidden">
+      <Panel className="p-3">
+        <Notice>Data kawasan gagal dimuat. {galat}</Notice>
+        <Button ukuran="sm" className="mt-2" onClick={() => void muatDemo()} ikon={<ArrowClockwise size={16} />}>
+          Muat ulang data
+        </Button>
+      </Panel>
+    </div>
+  )
+}
+
 function LapisanPeta() {
   const selection = useApp((s) => s.selection)
-  const [lebar, setLebar] = useState(true)
+  const kecil = useLayarKecil()
   return (
     <>
       <div className="absolute inset-x-3 top-[76px] z-[11] lg:inset-x-auto lg:left-4 lg:top-[88px] lg:w-[408px]">
@@ -79,27 +120,14 @@ function LapisanPeta() {
       </div>
 
       {selection ? (
-        <aside
-          className={cx(
-            // z-[12] di mobile: lembar laporan berada di atas tombol kontrol peta
-            'absolute inset-x-0 bottom-0 z-[12] flex flex-col transition-[max-height] duration-300',
-            lebar ? 'max-h-[58dvh]' : 'max-h-[204px]',
-            'lg:inset-x-auto lg:bottom-4 lg:left-4 lg:top-[156px] lg:z-10 lg:max-h-none lg:w-[408px]',
-          )}
-        >
-          <ReportPanel
-            pegangan={
-              <button
-                type="button"
-                onClick={() => setLebar((v) => !v)}
-                aria-label={lebar ? 'Kecilkan laporan' : 'Buka laporan penuh'}
-                className="mx-auto mt-1.5 grid h-5 w-20 shrink-0 place-items-center lg:hidden"
-              >
-                <span className="h-1 w-10 rounded-full bg-line-2" />
-              </button>
-            }
-          />
-        </aside>
+        kecil ? (
+          // ponsel: lembar bawah yang bisa diseret (intip, sedang, penuh)
+          <LaporanMobile />
+        ) : (
+          <aside className="absolute bottom-4 left-4 top-[156px] z-10 flex w-[408px] flex-col">
+            <ReportPanel />
+          </aside>
+        )
       ) : (
         <>
           <div className="absolute left-4 top-[156px] z-10 hidden w-[408px] lg:block">
@@ -109,6 +137,7 @@ function LapisanPeta() {
         </>
       )}
       <MapChrome />
+      <StatusMobile />
     </>
   )
 }
@@ -120,9 +149,17 @@ export default function App() {
   const selection = useApp((s) => s.selection)
   const tenor = useApp((s) => s.tenor)
   const adaGrid = useApp((s) => !!s.grid)
+  const wilayah = useApp((s) => s.wilayah)
   const sudahBaca = useRef(false)
 
   useEffect(() => {
+    // wilayah awal dari tautan: parameter w, atau wilayah yang memuat titik ll
+    const p = bacaRute(window.location.hash).params
+    const w = p.get('w')
+    let id = adalahIdWilayah(w) ? w : null
+    const ll = p.get('ll')?.split(',').map(Number)
+    if (!id && ll && ll.length === 2 && ll.every(Number.isFinite)) id = wilayahDiTitik([ll[1]!, ll[0]!])?.id ?? null
+    if (id) useApp.setState({ wilayah: id })
     void useApp.getState().muatDemo()
   }, [])
 
@@ -130,6 +167,12 @@ export default function App() {
   useEffect(() => {
     if (status !== 'siap' || halaman !== 'peta') return
     const s = useApp.getState()
+    // tautan ke wilayah lain (ditempel saat aplikasi terbuka): pindah wilayah dulu, efek ini jalan lagi setelahnya
+    const w = rute.params.get('w')
+    if (adalahIdWilayah(w) && w !== s.wilayah) {
+      void s.pilihWilayah(w)
+      return
+    }
     const k = rute.params.get('k')
     const ll = rute.params.get('ll')
     const bacaTenor = () => {
@@ -168,6 +211,7 @@ export default function App() {
     navigasi(
       'peta',
       {
+        w: s.wilayah,
         k: sel && !pakaiTitik ? sel.kawasanId : null,
         ll: sel && pakaiTitik ? `${sel.lngLat[1].toFixed(5)},${sel.lngLat[0].toFixed(5)}` : null,
         n: sel && pakaiTitik && sel.label !== LABEL_TITIK ? sel.label.slice(0, 60) : null,
@@ -183,7 +227,7 @@ export default function App() {
       {halaman === 'peta' ? (
         <LapisanPeta />
       ) : (
-        <main className="scroll-thin absolute inset-0 z-20 overflow-y-auto bg-bg pt-[88px]">
+        <main className="scroll-thin absolute inset-0 z-20 overflow-y-auto bg-bg pb-[calc(84px+env(safe-area-inset-bottom))] pt-[88px] lg:pb-0">
           <Suspense
             fallback={
               <div className="mx-auto w-full max-w-[1240px] px-4 md:px-8">
@@ -192,11 +236,13 @@ export default function App() {
               </div>
             }
           >
-            {halaman === 'dashboard' ? <DashboardView /> : halaman === 'bandingkan' ? <CompareView /> : <MethodView />}
+            {/* key: filter kecamatan dan pilihan baris milik wilayah lama, jadi diatur ulang saat pindah wilayah */}
+            {halaman === 'dashboard' ? <DashboardView key={wilayah} /> : halaman === 'bandingkan' ? <CompareView /> : <MethodView />}
           </Suspense>
         </main>
       )}
       <TopBar halaman={halaman} />
+      <NavBawah halaman={halaman} />
     </div>
   )
 }

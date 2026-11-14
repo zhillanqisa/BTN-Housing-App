@@ -39,14 +39,14 @@ from rasterio import features
 from scipy import ndimage
 from shapely.geometry import shape
 
-from umum import AOI_KOTA, EPSG_UTM, OLAH, REPO
+from umum import AOI_KOTA, EPSG_UTM, OLAH, REPO, WILAYAH
 
 gdal.UseExceptions()
 
 MENTAH = OLAH / "konteks" / "mentah" / "peta_geologi_magelang_semarang_100k.jpg"
 KERJA = OLAH / "konteks"
-KELUAR = REPO / "data-raw" / "konteks" / "geologi-psg-100k.shp"
-DEM_LOWLAND = REPO / "public" / "data" / "konteks-geologi.geojson"
+KELUAR = REPO / "data-raw" / "konteks" / f"{WILAYAH}-geologi-psg-100k.shp"
+DEM_LOWLAND = REPO / "public" / "data" / f"{WILAYAH}-konteks-geologi.geojson"
 
 # Sudut bingkai di raster (kolom, baris) -> bujur, lintang. Dibaca dari gambar, ketelitian sekitar 1 piksel (50 m).
 SUDUT = [
@@ -229,6 +229,8 @@ def cek_geser(kelas: np.ndarray, tr: rasterio.Affine, kota: gpd.GeoDataFrame) ->
 
 
 def main() -> None:
+    if WILAYAH != "semarang":
+        sys.exit("Sudut bingkai, warna acuan, dan aturan satuan di skrip ini khusus Lembar Magelang dan Semarang. Wilayah lain butuh lembar peta sendiri.")
     if not MENTAH.exists():
         sys.exit(f"Raster peta geologi tidak ada: {MENTAH}")
     kota = gpd.read_file(AOI_KOTA).to_crs(EPSG_UTM)

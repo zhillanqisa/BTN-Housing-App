@@ -2,7 +2,7 @@
 // (2) daring lewat Nominatim, HANYA saat pengguna menekan Cari
 // (kebijakan Nominatim: tanpa autocomplete, maksimal 1 permintaan per detik).
 import { NOMINATIM } from './config'
-import { GAZETTEER } from './gazetteer'
+import type { Tempat } from './gazetteer'
 import type { Kawasan, Position } from './types'
 
 export interface HasilCari {
@@ -25,7 +25,7 @@ export function normal(s: string): string {
 }
 
 /** Saran instan tanpa jaringan. */
-export function cariLokal(q: string, kawasan: Kawasan[], maks = 6): HasilCari[] {
+export function cariLokal(q: string, kawasan: Kawasan[], maks = 6, tempat: Tempat[] = []): HasilCari[] {
   const n = normal(q).replace(/^(kelurahan|kel|kecamatan|kec|desa)\s+/, '')
   if (n.length < 2) return []
   const skor = (nama: string): number => {
@@ -35,7 +35,7 @@ export function cariLokal(q: string, kawasan: Kawasan[], maks = 6): HasilCari[] 
     return m.includes(n) ? 1 : 0
   }
   const calon: { s: number; h: HasilCari }[] = []
-  for (const t of GAZETTEER) {
+  for (const t of tempat) {
     const s = skor(t.label)
     if (s) {
       calon.push({
@@ -68,8 +68,8 @@ export function cariLokal(q: string, kawasan: Kawasan[], maks = 6): HasilCari[] 
 
 let terakhir = 0
 
-/** Cari alamat lewat Nominatim, dibatasi ke sekitar Kota Semarang. */
-export async function cariNominatim(q: string, signal?: AbortSignal): Promise<HasilCari[]> {
+/** Cari alamat lewat Nominatim, dibatasi ke kotak wilayah yang sedang dipilih. */
+export async function cariNominatim(q: string, signal?: AbortSignal, viewbox: string = NOMINATIM.viewbox): Promise<HasilCari[]> {
   const jeda = 1100 - (Date.now() - terakhir)
   if (jeda > 0) await new Promise((r) => setTimeout(r, jeda))
   terakhir = Date.now()
@@ -80,7 +80,7 @@ export async function cariNominatim(q: string, signal?: AbortSignal): Promise<Ha
     q,
     limit: '5',
     countrycodes: 'id',
-    viewbox: NOMINATIM.viewbox,
+    viewbox,
     bounded: '1',
     'accept-language': 'id',
   }).toString()

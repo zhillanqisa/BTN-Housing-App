@@ -2,11 +2,12 @@
 // tenor, ambang kategori, daftar banding, dan tampilan peta.
 import { useMemo } from 'react'
 import { create } from 'zustand'
-import { DEFAULT_TENOR, DEFAULT_THRESHOLDS, GRID_URL, MAKS_BANDING, THRESHOLD_LIMITS } from './config'
+import { DEFAULT_TENOR, DEFAULT_THRESHOLDS, MAKS_BANDING, THRESHOLD_LIMITS } from './config'
 import { ambilDatasetDemo, cariKawasanDiTitik, indeksKawasan } from './data'
 import { ambilDeret, ambilGrid, type Grid } from './grid'
 import { ambilKonteks, JENIS_LAPIS, type JenisLapis, type LapisKonteks } from './konteks'
 import { bacaLokasi, kunciTitik, LABEL_TITIK, type Bacaan } from './lokasi'
+import { urlWilayah, WILAYAH_AWAL, wilayahDiTitik, type IdWilayah } from './wilayah'
 import type { AsalPilihan, Dataset, DatasetMeta, Kawasan, ModePeta, Position, Selection, Tema, Tenor, Thresholds, TitikBanding } from './types'
 
 let indeks = new Map<string, Kawasan>()
@@ -56,8 +57,12 @@ export interface AppState {
   konteks: Partial<Record<JenisLapis, LapisKonteks>>
   /** Lapis konteks yang ditampilkan di peta. null = hanya laju. */
   lapisKonteks: JenisLapis | null
+  /** Wilayah yang sedang dibuka. Semua data (kelurahan, grid, konteks) milik wilayah ini. */
+  wilayah: IdWilayah
 
   muatDemo: () => Promise<void>
+  /** Pindah wilayah: muat datanya; pilihan titik dipertahankan hanya bila ada di wilayah baru. */
+  pilihWilayah: (w: IdWilayah) => Promise<void>
   pakaiDataset: (ds: Dataset, grid?: Grid | null) => void
   pilihTitik: (lngLat: Position, asal: AsalPilihan, label?: string) => void
   pilihKawasan: (id: string, asal: AsalPilihan) => void
@@ -73,7 +78,9 @@ export interface AppState {
   setLapisKonteks: (l: JenisLapis | null) => void
 }
 
-let konteksDiminta = false
+let mintaKe = 0
+/** Wilayah milik data yang sedang terpasang; beda dengan state.wilayah selama data wilayah baru dimuat. */
+let wilayahTermuat: IdWilayah | null = null
 
 export const useApp = create<AppState>()((set, get) => ({
   status: 'memuat',
@@ -92,30 +99,51 @@ export const useApp = create<AppState>()((set, get) => ({
   tigaD: true,
   konteks: {},
   lapisKonteks: null,
+  wilayah: WILAYAH_AWAL,
 
   muatDemo: async () => {
-    set({ status: 'memuat', galat: null })
-    // lapis konteks kecil dan tidak wajib: dimuat sekali, di samping data utama
-    if (!konteksDiminta) {
-      konteksDiminta = true
-      for (const j of JENIS_LAPIS) {
-        void ambilKonteks(j).then((l) => {
-          if (l) set((s) => ({ konteks: { ...s.konteks, [j]: l } }))
-        })
-      }
+    const w = get().wilayah
+    const url = urlWilayah(w)
+    // permintaan lama yang selesai belakangan tidak boleh menimpa wilayah yang baru dipilih
+    const ke = ++mintaKe
+    set({ status: 'memuat', galat: null, konteks: {} })
+    // lapis konteks kecil dan tidak wajib, dimuat di samping data utama
+    for (const j of JENIS_LAPIS) {
+      void ambilKonteks(j, url.konteks[j]).then((l) => {
+        if (l && ke === mintaKe) set((s) => ({ konteks: { ...s.konteks, [j]: l } }))
+      })
     }
     try {
-      const [ds, grid] = await Promise.all([ambilDatasetDemo(), ambilGrid(GRID_URL)])
+      const [ds, grid] = await Promise.all([ambilDatasetDemo(url.kawasan), ambilGrid(url.grid)])
+      if (ke !== mintaKe) return
       get().pakaiDataset(ds, grid)
+      wilayahTermuat = w
       // deret waktu adalah file terbesar: dimuat setelah peta dan laju tampil
       if (grid) {
-        void ambilDeret(grid, GRID_URL).then((ok) => {
+        void ambilDeret(grid, url.grid).then((ok) => {
           if (ok && get().grid === grid) set((s) => ({ versiGrid: s.versiGrid + 1 }))
         })
       }
     } catch (e) {
-      set({ status: 'gagal', galat: e instanceof Error ? e.message : 'Gagal memuat data.' })
+      if (ke !== mintaKe) return
+      const galat = e instanceof Error ? e.message : 'Gagal memuat data.'
+      // data wilayah lama tidak boleh tetap tampil di bawah nama wilayah baru
+      if (wilayahTermuat !== w) {
+        indeks = new Map()
+        wilayahTermuat = null
+        set((s) => ({ status: 'gagal', galat, meta: null, kawasan: [], grid: null, selection: null, banding: [], versiData: s.versiData + 1, versiGrid: s.versiGrid + 1 }))
+      } else set({ status: 'gagal', galat })
     }
+  },
+
+  pilihWilayah: async (w) => {
+    const s = get()
+    if (w === s.wilayah && s.status === 'siap') return
+    const sel = s.selection
+    const tetap = sel && wilayahDiTitik(sel.lngLat)?.id === w
+    // banding antarwilayah belum didukung: daftar banding dikosongkan saat pindah wilayah
+    set({ wilayah: w, selection: tetap ? sel : null, banding: [] })
+    await get().muatDemo()
   },
 
   pakaiDataset: (ds, grid = null) => {

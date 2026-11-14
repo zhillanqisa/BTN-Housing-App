@@ -18,7 +18,9 @@ Jalankan:
     python pipeline/04_mintpy.py --lintasan desc
 
 Pilihan olah (semua tertulis di konfigurasi yang dihasilkan):
-- Titik referensi: stasiun GNSS CSEM, yang stabil menurut Susilo dkk. (2023).
+- Titik referensi: stasiun GNSS acuan wilayah (Semarang: CSEM, stabil menurut Susilo dkk. 2023).
+  Bila piksel stasiun tidak tersambung di semua interferogram, dipakai piksel andal terdekat
+  dalam radius RADIUS_REF_PIKSEL.
 - Koreksi troposfer: korelasi fase dengan ketinggian (tanpa data cuaca luar).
 - Koreksi galat DEM: aktif.
 - Piksel dipakai bila koherensi temporal minimal 0,7.
@@ -31,16 +33,17 @@ import sys
 from pathlib import Path
 
 import h5py
+import numpy as np
+from pyproj import Transformer
 
-from umum import CSEM_LALO, LINTASAN, dir_lintasan
+from umum import CSEM_LALO, EPSG_UTM, LINTASAN, TINGGI_BUKIT_M, TROPOSFER, UNWRAP, MAKS_HARI_PASANGAN, dir_lintasan
 
 MIN_KOHERENSI_TEMPORAL = 0.7
-# Piksel di atas tinggi ini (meter di atas elipsoid, sekitar 55 m di atas laut) dianggap
-# perbukitan stabil dan dipakai menaksir koreksi troposfer.
-TINGGI_BUKIT_M = 80.0
 # Citra dibuang bila interferogram terbaiknya pun tersambung di bawah pecahan ini dari piksel darat.
 # Interferogram normal di Semarang tersambung 60% ke atas; citra rusak sekitar 1%.
 MIN_TERSAMBUNG = 0.2
+# Bila piksel stasiun acuan tidak tersambung di semua interferogram: cari piksel andal dalam radius ini (80 m/piksel).
+RADIUS_REF_PIKSEL = 6
 # Keluaran yang bergantung pada koreksi troposfer. Dihapus sebelum tahap 2 supaya tidak ada sisa olah lama.
 TURUNAN_TROPOSFER = (
     "timeseries_tropHgt.h5",
@@ -55,13 +58,15 @@ TURUNAN_TROPOSFER = (
 )
 
 
-def konfigurasi(lintasan: str, buang_tanggal: list[str]) -> str:
+def konfigurasi(lintasan: str, buang_tanggal: list[str], tropo: bool = TROPOSFER == "bukit", ref: tuple[float, float] = CSEM_LALO) -> str:
     d = dir_lintasan(lintasan).as_posix()
-    lat, lon = CSEM_LALO
+    lat, lon = ref
     buang = ",".join(buang_tanggal) if buang_tanggal else "no"
     return f"""# Konfigurasi MintPy untuk PANTAU AMBLES, lintasan {lintasan}. Dibuat oleh pipeline/04_mintpy.py.
 # Citra rusak (semua interferogramnya nyaris tanpa piksel tersambung), dicari otomatis oleh 04_mintpy.py.
 mintpy.network.excludeDate = {buang}
+# Pasangan lebih lama dari ini tidak dipakai inversi (umum.py: maks_hari_pasangan).
+mintpy.network.tempBaseMax = {MAKS_HARI_PASANGAN or 'auto'}
 
 mintpy.load.processor      = hyp3
 mintpy.load.unwFile        = {d}/hyp3/*/*_unw_phase_clip.tif
@@ -76,8 +81,10 @@ mintpy.reference.lalo      = {lat:.5f}, {lon:.5f}
 
 # Koreksi troposfer dijalankan oleh 04_mintpy.py dengan masker perbukitan (lihat docstring skrip).
 # Nilai ini hanya memberi tahu MintPy nama file deret waktu yang sudah dikoreksi.
-mintpy.troposphericDelay.method    = height_correlation
+mintpy.troposphericDelay.method    = {"height_correlation" if tropo else "no"}
 mintpy.deramp                      = no
+# Koreksi galat unwrapping (umum.py: unwrap). phase_closure memakai triplet jaringan SBAS.
+mintpy.unwrapError.method          = {UNWRAP}
 mintpy.topographicResidual         = yes
 mintpy.networkInversion.minTempCoh = {MIN_KOHERENSI_TEMPORAL}
 
@@ -95,8 +102,14 @@ def jalankan(perintah: list[str], kerja: Path) -> None:
 
 def tanggal_rusak(kerja: Path) -> list[str]:
     """Tanggal citra yang SEMUA interferogramnya tersambung di bawah MIN_TERSAMBUNG piksel darat."""
-    with h5py.File(kerja / "waterMask.h5", "r") as h:
-        darat = h["waterMask"][:].astype(bool)
+    # waterMask.h5 baru dibuat MintPy di langkah sesudah load_data; pada olahan pertama ambil dari geometri
+    if (kerja / "waterMask.h5").exists():
+        with h5py.File(kerja / "waterMask.h5", "r") as h:
+            darat = h["waterMask"][:].astype(bool)
+    else:
+        with h5py.File(kerja / "inputs" / "geometryGeo.h5", "r") as h:
+            tinggi = h["height"][:]
+            darat = h["waterMask"][:].astype(bool) if "waterMask" in h else tinggi == tinggi
     with h5py.File(kerja / "inputs" / "ifgramStack.h5", "r") as h:
         pasangan = [(a.decode(), b.decode()) for a, b in h["date"][:]]
         tersambung = [float((h["connectComponent"][i][darat] > 0).mean()) for i in range(len(pasangan))]
@@ -105,6 +118,42 @@ def tanggal_rusak(kerja: Path) -> list[str]:
         for t in (a, b):
             terbaik[t] = max(terbaik.get(t, 0.0), f)
     return sorted(t for t, f in terbaik.items() if f < MIN_TERSAMBUNG)
+
+
+def referensi_andal(kerja: Path, buang_tanggal: list[str]) -> tuple[float, float]:
+    """Titik acuan: piksel stasiun bila tersambung di semua interferogram, bila tidak piksel andal terdekat.
+
+    Andal = komponen tersambung bukan nol di semua interferogram yang dipakai (syarat masker
+    maskConnComp MintPy) dengan koherensi rata-rata tertinggi, sedikit dikurangi jarak.
+    """
+    lat, lon = CSEM_LALO
+    with h5py.File(kerja / "inputs" / "ifgramStack.h5", "r") as h:
+        at = dict(h.attrs)
+        pasangan = [(a.decode(), b.decode()) for a, b in h["date"][:]]
+        pakai = [i for i, (a, b) in enumerate(pasangan) if a not in buang_tanggal and b not in buang_tanggal]
+        ny, nx = h["connectComponent"].shape[1:]
+        sambung = np.ones((ny, nx), bool)
+        koh = np.zeros((ny, nx), np.float64)
+        for i in pakai:
+            sambung &= h["connectComponent"][i] != 0
+            koh += h["coherence"][i]
+        koh /= max(1, len(pakai))
+    x, y = Transformer.from_crs(4326, EPSG_UTM, always_xy=True).transform(lon, lat)
+    x0, y0, dx, dy = (float(at[k]) for k in ("X_FIRST", "Y_FIRST", "X_STEP", "Y_STEP"))
+    c, r = int((x - x0) / dx), int((y - y0) / dy)
+    if sambung[r, c]:
+        print(f"Acuan di piksel stasiun ({r}, {c}), koherensi rata-rata {koh[r, c]:.2f}.", flush=True)
+        return lat, lon
+    rr, cc = np.mgrid[max(0, r - RADIUS_REF_PIKSEL) : min(ny, r + RADIUS_REF_PIKSEL + 1), max(0, c - RADIUS_REF_PIKSEL) : min(nx, c + RADIUS_REF_PIKSEL + 1)]
+    jarak = np.hypot(rr - r, cc - c)
+    skor = np.where(sambung[rr, cc] & (jarak <= RADIUS_REF_PIKSEL), koh[rr, cc] - 0.01 * jarak, -np.inf)
+    if not np.isfinite(skor.max()):
+        raise SystemExit(f"Tidak ada piksel tersambung dalam {RADIUS_REF_PIKSEL} piksel dari stasiun acuan. Pilih acuan lain di umum.py.")
+    k = np.unravel_index(np.argmax(skor), skor.shape)
+    r2, c2 = int(rr[k]), int(cc[k])
+    lon2, lat2 = Transformer.from_crs(EPSG_UTM, 4326, always_xy=True).transform(x0 + (c2 + 0.5) * dx, y0 + (r2 + 0.5) * dy)
+    print(f"Piksel stasiun tidak tersambung di semua interferogram. Acuan dipindah {jarak[k] * abs(dx):.0f} m ke ({r2}, {c2}), koherensi rata-rata {koh[r2, c2]:.2f}.", flush=True)
+    return float(lat2), float(lon2)
 
 
 def masker_bukit(kerja: Path) -> int:
@@ -140,19 +189,28 @@ def main() -> None:
     jalankan(["mintpy.cli.smallbaselineApp", str(cfg), "--dostep", "load_data"], kerja)
     rusak = tanggal_rusak(kerja)
     print(f"Citra rusak yang dibuang: {', '.join(rusak) if rusak else 'tidak ada'}", flush=True)
-    cfg.write_text(konfigurasi(a.lintasan, rusak), encoding="utf-8")
+    ref = referensi_andal(kerja, rusak)
+    cfg.write_text(konfigurasi(a.lintasan, rusak, ref=ref), encoding="utf-8")
     jalankan(["mintpy.cli.smallbaselineApp", str(cfg), "--start", "modify_network", "--end", "correct_ionosphere"], kerja)
 
-    for nama in TURUNAN_TROPOSFER:
+    for nama in (*TURUNAN_TROPOSFER, "timeseries_demErr.h5"):
         (kerja / nama).unlink(missing_ok=True)
-    n_bukit = masker_bukit(kerja)
-    if n_bukit < 1000:
-        raise SystemExit(f"Hanya {n_bukit} piksel perbukitan yang andal; terlalu sedikit untuk menaksir koreksi troposfer.")
-    print(f"Koreksi troposfer ditaksir dari {n_bukit} piksel perbukitan (tinggi di atas {TINGGI_BUKIT_M:.0f} m).", flush=True)
-    jalankan(
-        ["mintpy.cli.tropo_phase_elevation", "timeseries.h5", "-g", "inputs/geometryGeo.h5", "-m", "maskBukit.h5", "-o", "timeseries_tropHgt.h5"],
-        kerja,
-    )
+    pakai_tropo = TROPOSFER == "bukit"
+    if pakai_tropo:
+        n_bukit = masker_bukit(kerja)
+        if n_bukit < 1000:
+            print(f"Hanya {n_bukit} piksel perbukitan yang andal: koreksi troposfer dilewati.", flush=True)
+            pakai_tropo = False
+        else:
+            print(f"Koreksi troposfer ditaksir dari {n_bukit} piksel perbukitan (tinggi di atas {TINGGI_BUKIT_M:.0f} m).", flush=True)
+            jalankan(
+                ["mintpy.cli.tropo_phase_elevation", "timeseries.h5", "-g", "inputs/geometryGeo.h5", "-m", "maskBukit.h5", "-o", "timeseries_tropHgt.h5"],
+                kerja,
+            )
+    else:
+        print("Wilayah datar: koreksi troposfer korelasi-ketinggian tidak dipakai.", flush=True)
+    if not pakai_tropo:
+        cfg.write_text(konfigurasi(a.lintasan, rusak, tropo=False, ref=ref), encoding="utf-8")
 
     jalankan(["mintpy.cli.smallbaselineApp", str(cfg), "--start", "deramp"], kerja)
 

@@ -64,7 +64,8 @@ export interface ValidasiProses {
   /** Selisih laju vertikal dari dua lintasan satelit independen pada piksel yang sama. */
   antarLintasan?: { n: number; rmse: number; bias: number; r: number }
   /** Laju InSAR di lokasi stasiun GNSS dibanding laju GNSS. */
-  gnss?: { stasiun: string; gnss: number; insar: number }[]
+  /** insar null = stasiun tidak terukur (di luar cakupan citra atau koherensi rendah) */
+  gnss?: { stasiun: string; peran?: 'titik ikat' | 'pembanding'; gnss: number; insar: number | null }[]
   lulus: boolean
   catatan?: string
 }

@@ -162,6 +162,13 @@
     scrollbar-width: thin;
     scrollbar-color: var(--line-2) transparent;
   }
+  /* Deret yang bisa digeser mendatar tanpa bilah gulir (chip di ponsel). */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
   .tnum {
     font-variant-numeric: tabular-nums;
   }
@@ -283,6 +290,22 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Ponsel: deret kartu contoh digeser dengan jari, tanpa bilah gulir. Atribusi peta pindah ke bawah
+   kolom tombol kanan supaya tidak tertutup navigasi bawah dan lembar laporan. */
+@media (max-width: 1023.98px) {
+  .hp-tanpa-gulir {
+    scrollbar-width: none;
+  }
+  .hp-tanpa-gulir::-webkit-scrollbar {
+    display: none;
+  }
+  .maplibregl-ctrl-bottom-right {
+    top: 316px;
+    right: 6px;
+    bottom: auto;
   }
 }
 

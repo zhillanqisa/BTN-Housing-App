@@ -2,14 +2,14 @@
 
 Masukan:
     <kerja>/hasil/vertikal.npz dan validasi.json   dari langkah 5
-    public/data/semarang-kawasan.geojson           geometri dan nama kelurahan (angkanya diganti)
+    public/data/<wilayah>-kawasan.geojson          geometri dan nama kelurahan (angkanya diganti)
 
 Keluaran di public/data, format sama dengan scripts/build-demo-data.mjs:
-    semarang-grid.json         kepala grid piksel
-    semarang-grid-laju.bin     Int16 per piksel, x skalaLaju = cm/tahun, positif = turun
-    semarang-grid-sigma.bin    Int16 per piksel, galat
-    semarang-grid-deret.bin    Int16, deret triwulanan piksel terukur, x skalaDeret = cm
-    semarang-kawasan.geojson   ringkasan per kelurahan, metadata jenis "olahan"
+    <wilayah>-grid.json         kepala grid piksel
+    <wilayah>-grid-laju.bin     Int16 per piksel, x skalaLaju = cm/tahun, positif = turun
+    <wilayah>-grid-sigma.bin    Int16 per piksel, galat
+    <wilayah>-grid-deret.bin    Int16, deret triwulanan piksel terukur, x skalaDeret = cm
+    <wilayah>-kawasan.geojson  ringkasan per kelurahan, metadata jenis "olahan"
 
 Jalankan:
     python pipeline/06_ekspor.py
@@ -28,7 +28,7 @@ from rasterio import features
 from rasterio.transform import from_origin
 from shapely.geometry import shape
 
-from umum import KERJA, REPO
+from umum import AREA_STABIL, GNSS, KERJA, LINTASAN, NAMA_WILAYAH, PEMBANDING, REF_LAJU_TURUN_CM, REF_NAMA, REPO, WILAYAH, dir_lintasan
 
 KELUAR = REPO / "public" / "data"
 SEL = 0.00072
@@ -44,7 +44,6 @@ SUMBER = [
     {"nama": "Citra radar: Copernicus Sentinel-1 (ESA), diunduh lewat Alaska Satellite Facility", "url": "https://search.asf.alaska.edu/", "catatan": "Berisi data Copernicus Sentinel yang dimodifikasi."},
     {"nama": "Interferogram: ASF HyP3, produk InSAR burst (ISCE2)", "url": "https://hyp3-docs.asf.alaska.edu/"},
     {"nama": "Deret waktu: MintPy, Yunjun, Fattahi & Amelung (2019)", "url": "https://doi.org/10.1016/j.cageo.2019.104331"},
-    {"nama": "Titik ikat GNSS: Susilo dkk. (2023), stasiun CSEM (CC BY 4.0)", "url": "https://doi.org/10.5281/zenodo.7775016"},
     {"nama": "Batas kelurahan: © OpenStreetMap contributors (ODbL)", "url": "https://www.openstreetmap.org/copyright"},
     {
         "nama": "Rentang pembanding: Chaussard, Amelung, Abidin & Hong (2013), InSAR 2007-2009",
@@ -57,6 +56,19 @@ SUMBER = [
         "catatan": "Tanah Mas 5,5-7,2 cm/tahun, sebagaimana dirujuk di rangkuman tim.",
     },
 ]
+
+BATAS_BPS = {"nama": "Batas desa/kelurahan: BPS 2020 lewat HDX COD-AB (CC BY-IGO)", "url": "https://data.humdata.org/dataset/cod-ab-idn"}
+# Kisaran publikasi untuk dibandingkan dengan hasil olah. Hanya yang angkanya dirujuk langsung.
+LITERATUR = {
+    "semarang": SUMBER[4:],
+    "jakarta": [
+        {
+            "nama": "Rentang pembanding: Abidin dkk. (2011), Land subsidence of Jakarta (Indonesia) and its relation with urban development, Natural Hazards 59",
+            "url": "https://doi.org/10.1007/s11069-011-9866-9",
+            "catatan": "1 sampai 15 cm/tahun, di beberapa lokasi sampai 20-28 cm/tahun (pengukuran 1982-2010).",
+        }
+    ],
+}
 
 
 def r(v: float, angka: int = 1) -> float:
@@ -77,7 +89,7 @@ def main() -> None:
     hasil = KERJA / "hasil"
     z = np.load(hasil / "vertikal.npz")
     validasi = json.loads((hasil / "validasi.json").read_text(encoding="utf-8"))
-    berkas_kawasan = KELUAR / "semarang-kawasan.geojson"
+    berkas_kawasan = KELUAR / f"{WILAYAH}-kawasan.geojson"
     kawasan = json.loads(berkas_kawasan.read_text(encoding="utf-8"))
     fitur = kawasan["features"]
     bentuk = [shape(f["geometry"]) for f in fitur]
@@ -148,23 +160,55 @@ def main() -> None:
 
     # ---------- metadata ----------
     lin = validasi["lintasan"]
-    al, gn, bk = validasi["antarLintasan"], validasi["gnss"][0], validasi["bukit"]
+    al, bk = validasi["antarLintasan"], validasi.get("bukit")
     awal, akhir = min(d["awal"] for d in lin), max(d["akhir"] for d in lin)
     lulus = bool(validasi["gerbang"]["lulus"])
     # dihitung pada grid aplikasi, supaya cocok dengan jumlah piksel yang ditampilkan aplikasi
     satu = int((terukur & (sumber > 1)).sum())
     hari_ini = date.today().isoformat()
+
+    # titik ikat, koreksi atmosfer, dan catatan validasi mengikuti konfigurasi wilayah
+    if REF_LAJU_TURUN_CM is not None:
+        acuan = f"stasiun GNSS {REF_NAMA}"
+        referensi = f"Stasiun GNSS {REF_NAMA} ({GNSS[REF_NAMA]['lokasi']}), stabil menurut Susilo dkk. (2023)"
+    else:
+        acuan = f"area stabil ({AREA_STABIL['keterangan']})"
+        referensi = f"Area stabil: {AREA_STABIL['keterangan']}. Tidak ada stasiun GNSS stabil di dekat wilayah ini."
+    pakai_tropo = all((dir_lintasan(l) / "mintpy" / "timeseries_tropHgt_demErr.h5").exists() for l in LINTASAN)
+    koreksi = "Korelasi fase dengan ketinggian, ditaksir dari piksel perbukitan saja" if pakai_tropo else "Tidak ada (wilayah datar, korelasi fase dengan ketinggian tidak bermakna)"
+    stasiun = [s["stasiun"] for s in validasi["gnss"]]
+    sumber = [*SUMBER[:3]]
+    if stasiun:
+        sumber.append({"nama": f"GNSS: Susilo dkk. (2023), stasiun {', '.join(stasiun)} (CC BY 4.0)", "url": "https://doi.org/10.5281/zenodo.7775016"})
+    sumber.append(BATAS_BPS if WILAYAH in ("pekalongan", "demak") else SUMBER[3])
+    sumber.extend(LITERATUR.get(WILAYAH, []))
+    catatan = []
+    if REF_LAJU_TURUN_CM is not None:
+        catatan.append(f"{REF_NAMA} adalah titik ikat, jadi bukan pembanding yang independen.")
+    else:
+        catatan.append(f"Laju diikat ke {acuan}, karena tidak ada stasiun GNSS stabil di dekat wilayah ini.")
+    for s in validasi["gnss"]:
+        if s["peran"] == "pembanding" and s.get("insar") is not None:
+            catatan.append(
+                f"Stasiun {s['stasiun']} ({PEMBANDING[s['stasiun']]['lokasi']}) adalah pembanding independen: GNSS {koma(s['gnss'], 2)} cm/tahun (2018-2021), "
+                f"InSAR {koma(s['insar'], 2)} cm/tahun (2020-{akhir[:4]})."
+            )
+    if bk:
+        catatan.append(f"Perbukitan, yang semestinya stabil, terukur median {koma(bk['median'], 2)} cm/tahun (80% pikselnya antara {koma(bk['p10'], 2)} dan {koma(bk['p90'], 2)}).")
+    catatan.append(f"{ribuan(satu)} dari {ribuan(n_valid)} piksel terukur hanya terlihat dari satu lintasan; di sana gerak dianggap vertikal seluruhnya.")
+    if not any(s["peran"] == "pembanding" for s in validasi["gnss"]):
+        catatan.append("Belum ada pembanding lapangan di kawasan yang ambles.")
     metadata = {
         "jenis": "olahan",
         "judul": "Laju penurunan tanah dari InSAR Sentinel-1",
-        "wilayah": "Kota Semarang",
+        "wilayah": NAMA_WILAYAH,
         "periode": [f"{awal[:4]}-{awal[4:6]}", f"{akhir[:4]}-{akhir[4:6]}"],
         "metode": (
             "InSAR deret waktu SBAS dari citra Sentinel-1, piksel 80 m. Interferogram dibuat di ASF HyP3, "
             "deret waktu disusun dengan MintPy, lalu dua arah lintasan satelit digabung menjadi gerak vertikal. "
-            "Laju adalah tren linear seluruh periode, relatif terhadap stasiun GNSS CSEM."
+            f"Laju adalah tren linear seluruh periode, relatif terhadap {acuan}."
         ),
-        "sumber": SUMBER,
+        "sumber": sumber,
         "dibuat": hari_ini,
         "catatan": (
             "Hasil olah tim dari data satelit, belum diverifikasi dengan pengukuran lapangan. "
@@ -173,20 +217,14 @@ def main() -> None:
         "proses": {
             "lintasan": [{"arah": d["arah"], "path": d["path"], "nCitra": d["nCitra"], "nPasangan": d["nPasangan"]} for d in lin],
             "resolusiM": int(z["piksel"]),
-            "referensi": "Stasiun GNSS CSEM, stabil menurut Susilo dkk. (2023)",
-            "koreksiAtmosfer": "Korelasi fase dengan ketinggian, ditaksir dari piksel perbukitan saja",
+            "referensi": referensi,
+            "koreksiAtmosfer": koreksi,
             "vertikal": "dua-lintasan",
             "validasi": {
                 "antarLintasan": al,
-                "gnss": [gn],
+                "gnss": [{k: v for k, v in s.items() if v is not None} for s in validasi["gnss"]],
                 "lulus": lulus,
-                "catatan": (
-                    f"CSEM adalah titik ikat, jadi bukan pembanding yang independen. "
-                    f"Perbukitan selatan, yang semestinya stabil, terukur median {koma(bk['median'], 2)} cm/tahun "
-                    f"(80% pikselnya antara {koma(bk['p10'], 2)} dan {koma(bk['p90'], 2)}). "
-                    f"{ribuan(satu)} dari {ribuan(n_valid)} piksel terukur hanya terlihat dari satu lintasan; di sana gerak dianggap vertikal seluruhnya. "
-                    "Belum ada pembanding lapangan di kawasan yang ambles."
-                ),
+                "catatan": " ".join(catatan),
             },
             "konteks": [],
         },
@@ -206,12 +244,12 @@ def main() -> None:
         "skalaDeret": SKALA_DERET,
         "epoch": epoch,
         "nValid": n_valid,
-        "berkas": {"laju": "semarang-grid-laju.bin", "sigma": "semarang-grid-sigma.bin", "deret": "semarang-grid-deret.bin"},
+        "berkas": {"laju": f"{WILAYAH}-grid-laju.bin", "sigma": f"{WILAYAH}-grid-sigma.bin", "deret": f"{WILAYAH}-grid-deret.bin"},
     }
 
     # ---------- tulis ----------
     berkas_kawasan.write_text(json.dumps({"type": "FeatureCollection", "metadata": metadata, "features": fitur}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    (KELUAR / "semarang-grid.json").write_text(json.dumps(kepala, separators=(",", ":")), encoding="utf-8")
+    (KELUAR / f"{WILAYAH}-grid.json").write_text(json.dumps(kepala, separators=(",", ":")), encoding="utf-8")
     (KELUAR / kepala["berkas"]["laju"]).write_bytes(laju.astype("<i2").tobytes())
     (KELUAR / kepala["berkas"]["sigma"]).write_bytes(sigma.astype("<i2").tobytes())
     (KELUAR / kepala["berkas"]["deret"]).write_bytes(deret.astype("<i2").tobytes())

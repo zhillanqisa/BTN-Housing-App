@@ -10,6 +10,8 @@ import { hitungProyeksi, klasifikasi, teksProyeksi } from '../lib/risk'
 import { navigasi } from '../lib/router'
 import { useApp } from '../lib/store'
 import type { Kategori, Kawasan, Proyeksi, Tenor } from '../lib/types'
+import RingkasanWilayah from '../components/RingkasanWilayah'
+import { wilayahById } from '../lib/wilayah'
 import { Button, Card, cx, JudulBagian, KategoriBadge, Notice, Segmented, Skeleton, Stat, Swatch, warnaKategori } from '../ui/primitives'
 
 interface Baris {
@@ -131,6 +133,8 @@ export default function DashboardView() {
   const pilihKawasan = useApp((s) => s.pilihKawasan)
   const adaGrid = useApp((s) => !!s.grid)
   const muatDemo = useApp((s) => s.muatDemo)
+  const wilayah = useApp((s) => s.wilayah)
+  const galat = useApp((s) => s.galat)
 
   const [kec, setKec] = useState('')
   const [kat, setKat] = useState<Set<Kategori>>(() => new Set(URUTAN_KATEGORI))
@@ -212,6 +216,8 @@ export default function DashboardView() {
     <div className="mx-auto w-full max-w-[1240px] px-4 pb-20 pt-2 md:px-8">
       <h1 className="text-[28px] font-bold tracking-tight text-ink md:text-[34px]">Dashboard kawasan</h1>
       <p className="mt-1 max-w-[65ch] text-[15px] text-ink-2">Pra-skrining banyak lokasi sekaligus untuk pengembang dan lembaga pembiayaan.</p>
+      <RingkasanWilayah />
+      <h2 className="mt-8 text-[20px] font-bold tracking-tight text-ink">Kelurahan di {wilayahById(wilayah)?.nama}</h2>
       {adaGrid && (
         <p className="mt-1 max-w-[65ch] text-[13.5px] text-ink-3">
           Angka di halaman ini adalah ringkasan per kelurahan (median piksel). Laju bisa berbeda antartitik dalam satu kelurahan, jadi untuk lokasi tertentu buka titiknya di peta.
@@ -226,7 +232,7 @@ export default function DashboardView() {
       {status === 'memuat' && <Skeleton className="mt-6 h-72 w-full" />}
       {status === 'gagal' && (
         <Card className="mt-6 p-6">
-          <p className="text-[14.5px] text-ink">Data kawasan gagal dimuat.</p>
+          <p className="text-[14.5px] text-ink">Data kawasan gagal dimuat. {galat}</p>
           <Button className="mt-3" onClick={() => void muatDemo()} ikon={<ArrowCounterClockwise size={17} />}>
             Muat ulang data
           </Button>
@@ -236,12 +242,12 @@ export default function DashboardView() {
       {status === 'siap' && (
         <>
           {/* satu baris filter untuk semua yang ada di bawahnya */}
-          <div className="mt-6 flex flex-wrap items-end gap-3">
-            <div>
+          <div className="mt-6 grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+            <div className="min-w-0">
               <label htmlFor="f-kec" className="mb-1.5 block text-[12.5px] font-medium text-ink-3">
                 Kecamatan
               </label>
-              <select id="f-kec" value={kec} onChange={(e) => setKec(e.target.value)} className={cx(kelasKontrol, 'min-w-[190px]')}>
+              <select id="f-kec" value={kec} onChange={(e) => setKec(e.target.value)} className={cx(kelasKontrol, 'w-full sm:w-auto sm:min-w-[190px]')}>
                 <option value="">Semua kecamatan</option>
                 {daftarKec.map((n) => (
                   <option key={n} value={n}>
@@ -250,13 +256,13 @@ export default function DashboardView() {
                 ))}
               </select>
             </div>
-            <div>
+            <div className="min-w-0">
               <label htmlFor="f-cari" className="mb-1.5 block text-[12.5px] font-medium text-ink-3">
                 Cari nama kawasan
               </label>
-              <input id="f-cari" value={cari} onChange={(e) => setCari(e.target.value)} className={cx(kelasKontrol, 'w-[200px]')} autoComplete="off" />
+              <input id="f-cari" value={cari} onChange={(e) => setCari(e.target.value)} className={cx(kelasKontrol, 'w-full sm:w-[200px]')} autoComplete="off" />
             </div>
-            <fieldset>
+            <fieldset className="col-span-2 min-w-0 sm:col-auto">
               <legend className="mb-1.5 text-[12.5px] font-medium text-ink-3">Kategori</legend>
               <div className="flex flex-wrap gap-1.5">
                 {URUTAN_KATEGORI.map((k) => {
@@ -275,7 +281,7 @@ export default function DashboardView() {
                         })
                       }
                       className={cx(
-                        'inline-flex h-11 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-semibold transition-colors',
+                        'inline-flex h-9 items-center gap-2 rounded-[12px] border px-2.5 text-[12.5px] font-semibold transition-colors sm:h-11 sm:px-3 sm:text-[13px]',
                         on ? 'border-ink bg-surface text-ink' : 'border-line-2 bg-transparent text-ink-3 line-through',
                       )}
                     >
@@ -286,11 +292,11 @@ export default function DashboardView() {
                 })}
               </div>
             </fieldset>
-            <div>
+            <div className="col-span-2 sm:col-auto">
               <div className="mb-1.5 text-[12.5px] font-medium text-ink-3">Tenor KPR</div>
               <Segmented label="Tenor KPR" nilai={tenor} onUbah={setTenor} opsi={TENORS.map((t) => ({ nilai: t, label: `${t} th` }))} />
             </div>
-            <Button varian="ghost" onClick={aturUlang} ikon={<ArrowCounterClockwise size={17} />}>
+            <Button varian="ghost" className="col-span-2 justify-self-start sm:col-auto" onClick={aturUlang} ikon={<ArrowCounterClockwise size={17} />}>
               Atur ulang
             </Button>
           </div>

@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { LABEL_KATEGORI } from '../lib/config'
 import { bacaLokasi } from '../lib/lokasi'
 import { fmt } from '../lib/format'
-import { SOROTAN } from '../lib/gazetteer'
+import { sorotanWilayah } from '../lib/gazetteer'
 import { klasifikasi } from '../lib/risk'
 import { useApp } from '../lib/store'
 import { Swatch } from '../ui/primitives'
@@ -27,22 +27,26 @@ export default function Sorotan() {
   const versiGrid = useApp((s) => s.versiGrid)
   const thresholds = useApp((s) => s.thresholds)
   const pilihTitik = useApp((s) => s.pilihTitik)
+  const wilayah = useApp((s) => s.wilayah)
   // angka kartu = bacaan di titik contoh (blok piksel bila ada grid), sama dengan laporan yang dibuka
   const kartu = useMemo(
     () =>
-      SOROTAN.flatMap((t) => {
+      sorotanWilayah(wilayah).flatMap((t) => {
         const b = bacaLokasi(t.lngLat, kawasan, grid)
         return b ? [{ t, k: b.data, kelurahan: b.kelurahan.nama }] : []
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [kawasan, grid, versiGrid],
+    [kawasan, grid, versiGrid, wilayah],
   )
   if (!kartu.length) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 pb-3 lg:left-[424px] lg:right-[268px] lg:pb-4">
-      <p className="pointer-events-auto mx-3 mb-2 inline-block rounded-full bg-[var(--glass)] px-3 py-1 text-[12px] font-semibold text-ink-2 backdrop-blur lg:mx-0">Coba lokasi contoh</p>
-      <ul className="scroll-thin pointer-events-auto flex snap-x gap-2.5 overflow-x-auto px-3 pb-1 lg:px-0" aria-label="Lokasi contoh">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(78px+env(safe-area-inset-bottom))] z-10 pb-2 lg:bottom-0 lg:left-[424px] lg:right-[268px] lg:pb-4">
+      <p className="pointer-events-auto mx-3 mb-2 inline-block rounded-full bg-[var(--glass)] px-3 py-1 text-[12px] font-semibold text-ink-2 backdrop-blur lg:mx-0">
+        <span className="lg:hidden">Ketuk peta, atau coba lokasi contoh</span>
+        <span className="hidden lg:inline">Coba lokasi contoh</span>
+      </p>
+      <ul className="scroll-thin hp-tanpa-gulir pointer-events-auto flex snap-x gap-2.5 overflow-x-auto px-3 pb-1 lg:px-0" aria-label="Lokasi contoh">
         {kartu.map(({ t, k, kelurahan }) => {
           const kat = klasifikasi(k.laju, k.memadai, thresholds)
           return (
@@ -50,7 +54,7 @@ export default function Sorotan() {
               <button
                 type="button"
                 onClick={() => pilihTitik(t.lngLat, 'sorotan', t.label)}
-                className="glass block w-[172px] rounded-[22px] p-3.5 text-left transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+                className="glass block w-[164px] rounded-[20px] p-3.5 text-left lg:w-[172px] lg:rounded-[22px] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
               >
                 <span className="block truncate text-[14px] font-bold text-ink">{t.label}</span>
                 <span className="block truncate text-[12px] text-ink-3">Kel. {kelurahan}</span>

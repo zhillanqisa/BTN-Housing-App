@@ -1,6 +1,6 @@
 # PANTAU AMBLES
 
-**Cek Tanah Sebelum KPR.** Web app untuk melihat laju penurunan tanah di sekitar sebuah titik di Kota Semarang dan proyeksinya selama masa cicilan KPR (Proyeksi Tenor). Dibuat untuk BTN Housingpreneur Batch 3, kategori Housing Innovation.
+**Cek Tanah Sebelum KPR.** Web app untuk melihat laju penurunan tanah di sekitar sebuah titik di kota pesisir utara Jawa yang ambles (Semarang, Jakarta, Pekalongan, Demak) dan proyeksinya selama masa cicilan KPR (Proyeksi Tenor). Dibuat untuk BTN Housingpreneur Batch 3, kategori Housing Innovation.
 
 Laporan mengikuti titik yang dipilih: angkanya dihitung dari blok piksel sekitar 240 m di sekitar titik itu, bukan rata-rata satu kelurahan. Dua titik dalam kelurahan yang sama bisa memberi hasil berbeda. Saat titik dipilih, batas kelurahannya disorot di peta.
 
@@ -8,7 +8,22 @@ Dua lapis konteks bisa ditumpangkan di peta dan muncul di laporan: pola ruang RT
 
 **Demo:** https://zhillanqisa.github.io/BTN-Housing-App/
 
-> **Status data:** peta memakai **hasil olah InSAR Sentinel-1** Januari 2020 sampai November 2026 (1.433 interferogram dari dua arah lintasan satelit, piksel 80 m). 82% piksel kota terukur. Laju dari dua lintasan yang saling independen cocok dengan RMSE 0,34 cm/tahun, dan perbukitan selatan terukur stabil. Belum ada pembanding lapangan di kawasan yang ambles, jadi angka ini bahan pertimbangan, bukan satu-satunya dasar keputusan. Rincian di [pipeline/README.md](pipeline/README.md).
+> **Status data:** peta memakai **hasil olah InSAR Sentinel-1** Januari 2020 sampai November 2026 (dua arah lintasan satelit, piksel 80 m). Angka ini bahan pertimbangan, bukan satu-satunya dasar keputusan. Rincian di [pipeline/README.md](pipeline/README.md).
+
+## Wilayah
+
+Pilih wilayah di bilah atas atau di kartu awal. Tautan menyimpan wilayahnya (`#/?w=jakarta`). Klik titik di wilayah lain langsung memindah wilayah.
+
+| Wilayah | Data | Piksel terukur | Antarlintasan (RMSE) | Pembanding GNSS | Geologi | Pola ruang |
+|---|---|---|---|---|---|---|
+| Kota Semarang | 1.433 interferogram | 82% | 0,34 cm/tahun | CSEM (titik ikat) | Lembar Magelang dan Semarang | RTRW Prov. Jateng 2024-2044 |
+| DKI Jakarta | 1.056 interferogram | 95% | 0,45 cm/tahun | CBTU (titik ikat), CJKT selisih 0,41, CTGR selisih 0,14 cm/tahun | Lembar Jakarta dan Kepulauan Seribu | RDTR DKI 2022 |
+| Kota Pekalongan | sedang diolah | | | CPKL (pembanding) | Lembar Banjarnegara dan Pekalongan | RTRW Prov. Jateng 2024-2044 |
+| Kabupaten Demak | sedang diolah | | | CSEM (titik ikat) | Lembar Kudus dan Salatiga | RTRW Prov. Jateng 2024-2044 |
+
+Dashboard punya kartu **Perbandingan wilayah pesisir** (luas yang turun minimal 4 cm/tahun, kelurahan berkategori tinggi, kelurahan tercepat, gerbang mutu), dibaca dari `public/data/ringkasan-wilayah.json` yang ditulis `node scripts/ringkasan-wilayah.mjs`.
+
+Temuan utama: Semarang 60 km² turun minimal 4 cm/tahun (tercepat Kelurahan Penggaron Lor 11,6 cm/tahun). Jakarta jauh lebih pelan dibanding angka 1982-2010: hanya 1,2 km² turun minimal 4 cm/tahun, terpusat di pesisir Muara Angke (sekitar 5 cm/tahun) dan Muara Baru (3 sampai 5 cm/tahun); rata-rata semua kelurahan di bawah 2 cm/tahun.
 
 ## Menjalankan
 
@@ -27,16 +42,16 @@ Hasil `dist/` berupa file statis dan bisa di-host gratis (GitHub Pages, Netlify,
 
 ## Alur demo yang disarankan
 
-1. Di halaman **Cek lokasi**, klik kartu contoh "Tanah Mas" atau cari alamat, atau klik titik mana pun di peta. Kotak hijau di peta menandai blok piksel yang dipakai untuk laporan, dan garis bercahaya menandai batas kelurahannya.
+1. Di halaman **Cek lokasi**, pilih wilayah di bilah atas, lalu klik kartu contoh (mis. "Tanah Mas" di Semarang, "Muara Angke" di Jakarta) atau cari alamat, atau klik titik mana pun di peta. Kotak hijau di peta menandai blok piksel yang dipakai untuk laporan, dan garis bercahaya menandai batas kelurahannya.
    Di legenda, pilih **Lapis konteks** RTRW atau Geologi untuk menumpangkan pola ruang atau satuan geologi. Bagian **Konteks lokasi** di laporan menyebut kelas di titik itu.
 2. Baca **Laporan Ambles**: status di titik itu, grafik riwayat, lalu Proyeksi Tenor. Coba klik titik lain di kelurahan yang sama dan bandingkan angkanya.
 3. Ganti tenor 10, 15, 20 tahun dan lihat rumah pada gambar ikut turun.
 4. Tekan **Unduh PDF** untuk laporan satu halaman.
 5. Tekan **Bandingkan**, pilih lokasi lain, lalu buka halaman **Bandingkan**.
-6. Buka **Dashboard** untuk tampilan institusi: filter, grafik, tabel, uji sensitivitas ambang, unduh CSV.
+6. Buka **Dashboard** untuk tampilan institusi: perbandingan antarwilayah, lalu filter, grafik, tabel, uji sensitivitas ambang, dan unduh CSV per kelurahan.
 7. Buka **Data & metode** untuk sumber data, batasan, dan fitur **Ganti data**.
 
-Tautan bisa dibagikan: `#/?ll=<lintang>,<bujur>&t=<tenor>`. Tautan lama `#/?k=<id kelurahan>` tetap terbuka dan diarahkan ke pusat kelurahan itu.
+Tautan bisa dibagikan: `#/?w=<wilayah>&ll=<lintang>,<bujur>&t=<tenor>`. Tautan lama `#/?k=<id kelurahan>` tetap terbuka dan diarahkan ke pusat kelurahan itu.
 
 ## Struktur proyek
 
@@ -55,21 +70,24 @@ src/
     importer.ts        impor CSV / GeoJSON
     pdf.ts             PDF Laporan Ambles (jsPDF, vektor)
     geocode.ts         pencarian lokal + Nominatim
+    wilayah.ts         daftar wilayah (kotak batas, lokasi contoh) dan alamat file data tiap wilayah
     store.ts router.ts state aplikasi dan router hash
   ui/primitives.tsx    komponen dasar
   styles/app.css       token desain (terang dan gelap)
 scripts/
   fetch-boundaries.mjs batas kelurahan dari OpenStreetMap (npm run data:boundaries)
+  ambil-batas-wilayah.mjs, siapkan-kawasan.mjs  batas wilayah baru dan kerangka ringkasan kelurahan
+  ringkasan-wilayah.mjs  ringkasan lintas wilayah untuk Dashboard
   build-demo-data.mjs  data demo ilustratif untuk uji antarmuka (npm run data:demo, menolak menimpa hasil olah asli tanpa --paksa)
 pipeline/              olah InSAR dari citra Sentinel-1 sampai file di public/data, dan lapis konteks (Python, lihat pipeline/README.md)
 data-raw/              batas kelurahan, kecamatan, kota (hasil skrip)
 data-raw/konteks/      shapefile pola ruang RTRW dan geologi permukaan, bisa disunting di QGIS
-public/data/           semarang-grid.* (grid piksel) dan semarang-kawasan.geojson, dibaca aplikasi
+public/data/           <wilayah>-grid.*, <wilayah>-kawasan.geojson, <wilayah>-konteks-*.geojson, ringkasan-wilayah.json
 ```
 
 ## Skema data
 
-Aplikasi membaca dua kelompok file di `public/data/`.
+Aplikasi membaca file per wilayah di `public/data/`, dengan awalan id wilayah (`semarang`, `jakarta`, `pekalongan`, `demak`). Contoh di bawah memakai Semarang.
 
 ### Grid piksel (peta dan laporan titik)
 
@@ -134,7 +152,7 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 
 ### Lapis konteks (peta dan laporan)
 
-`konteks-rtrw.geojson` dan `konteks-geologi.geojson`, ditulis oleh `pipeline/07_konteks.py`. Satu fitur = satu kelas.
+`<wilayah>-konteks-rtrw.geojson` dan `<wilayah>-konteks-geologi.geojson`, ditulis oleh `pipeline/07_konteks.py`. Satu fitur = satu kelas.
 
 - Properti fitur: `kode`, `nama`, `warna` (hex). RTRW menambah `fungsi` (Lindung atau Budi daya). Geologi menambah `batuan` dan `sifat`.
 - `metadata`: `judul`, `jenis` (`resmi` atau `perkiraan`), `skala`, `sumber`, `catatan`, `aturan` (cara digitasi atau perkiraan), dan `statistik`: per kelas `kode`, `nama`, `luasKm2`, `nPiksel`, `cakupan`, `median`, `p75`, `porsiTinggi` (bagian piksel yang turun minimal 4 cm/tahun).
@@ -142,8 +160,10 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 
 | Lapis | Sumber saat ini | Catatan |
 |---|---|---|
-| Pola ruang | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000. RTRW Kota Semarang yang rinci tidak bisa diambil pada 14 November 2026 |
-| Geologi | Peta Geologi Lembar Magelang dan Semarang 1:100.000 (Thanden dkk. 1996, Pusat Survei Geologi), raster dari GeoMap didigitasi tim dengan `pipeline/07a_digitasi_geologi.py` | 7 satuan di dalam kota. Batas Aluvium cocok 87% dengan kaki bukit pada DEM tanpa digeser. Ketelitian batas sekitar 100 sampai 200 m |
+| Pola ruang (Semarang, Pekalongan, Demak) | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000. RTRW kota/kabupaten yang rinci tidak bisa diambil pada 14 November 2026 |
+| Pola ruang (Jakarta) | RDTR DKI Jakarta 2022 (Pergub Nomor 31 Tahun 2022), layanan peta publik DPMPTSP DKI | Rinci sampai blok. Badan Jalan tidak ditampilkan; celah jalan antarblok ditutup supaya peta ringan |
+| Geologi (Semarang) | Peta Geologi Lembar Magelang dan Semarang 1:100.000 (Thanden dkk. 1996), didigitasi dengan `pipeline/07a_digitasi_geologi.py` | 7 satuan. Batas Aluvium cocok 87% dengan kaki bukit pada DEM tanpa digeser |
+| Geologi (Jakarta, Pekalongan, Demak) | Lembar Jakarta dan Kepulauan Seribu (Turkandi dkk. 1992), Banjarnegara dan Pekalongan (Condon dkk. 1996), Kudus (Suwarti dan Wikarno 1992), dan Salatiga (Sukardi dan Budhitrisna 1992); didigitasi dengan `pipeline/07b_geologi_lembar.py` | Warna satuan diambil dari kotak legenda lembar itu sendiri. Ketelitian batas sekitar 100 sampai 200 m |
 
 Hasil analisis: median laju di Aluvium 3,6 cm/tahun dan 48% pikselnya turun minimal 4 cm/tahun. Di keenam satuan batuan lain (Formasi Damar, Kaligetas, Kerek, Kalibeng, Jongkong, dan batuan gunungapi Gajahmungkur) median sekitar 0 dan tidak ada piksel yang turun secepat itu. Di dalam Aluvium pun ambles cepat terpusat di bagian utara dan timur; Aluvium di barat relatif stabil.
 
@@ -200,11 +220,12 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 
 - Citra radar: berisi data Copernicus Sentinel yang dimodifikasi (2020 sampai 2026), diunduh lewat Alaska Satellite Facility.
 - Interferogram: ASF HyP3. Deret waktu: MintPy (Yunjun, Fattahi & Amelung 2019).
-- Titik ikat GNSS: Susilo dkk. (2023), Zenodo `10.5281/zenodo.7775016`, CC BY 4.0.
-- Pola ruang: RTRW Provinsi Jawa Tengah 2024-2044 (Perda Provinsi Jawa Tengah Nomor 8 Tahun 2024).
+- GNSS (CSEM, CBTU, CJKT, CTGR, CPKL): Susilo dkk. (2023), Zenodo `10.5281/zenodo.7775016`, CC BY 4.0.
+- Pola ruang: RTRW Provinsi Jawa Tengah 2024-2044 (Perda Provinsi Jawa Tengah Nomor 8 Tahun 2024); RDTR DKI Jakarta 2022 (Peraturan Gubernur DKI Jakarta Nomor 31 Tahun 2022), layanan DPMPTSP DKI.
 - DEM: Copernicus GLO-30, © DLR e.V. 2010-2014 dan © Airbus Defence and Space GmbH 2014-2018, disediakan di bawah program Copernicus.
-- Geologi: Thanden, Sumadirdja, Richards, Sutisna dan Amin (1996), Peta Geologi Lembar Magelang dan Semarang, Jawa, 1:100.000, Pusat Survei Geologi (GeoMap Badan Geologi). Milik PSG, tidak diperjualbelikan. Raster tidak disimpan di repo.
-- Batas wilayah: © OpenStreetMap contributors (ODbL).
+- Geologi (semua raster dari GeoMap Badan Geologi, milik Pusat Survei Geologi, tidak diperjualbelikan, tidak disimpan di repo): Thanden, Sumadirdja, Richards, Sutisna dan Amin (1996), Lembar Magelang dan Semarang; Turkandi, Sidarto, Agustiyanto dan Purbo Hadiwidjoyo (1992), Lembar Jakarta dan Kepulauan Seribu; Condon, Pardyanto, Ketner, Amin, Gafoer dan Samodra (1996), Lembar Banjarnegara dan Pekalongan; Suwarti dan Wikarno (1992), Lembar Kudus; Sukardi dan Budhitrisna (1992), Lembar Salatiga; semuanya skala 1:100.000.
+- Batas wilayah: Semarang dan Jakarta © OpenStreetMap contributors (ODbL); Pekalongan dan Demak dari BPS 2020 lewat OCHA HDX (CC BY-IGO).
+- Rentang pembanding Jakarta: Abidin dkk. (2011), Natural Hazards 59.
 - Peta dasar: OpenFreeMap, © OpenMapTiles, data OpenStreetMap.
 - Pencarian alamat: Nominatim, [kebijakan pemakaian](https://operations.osmfoundation.org/policies/nominatim/).
 

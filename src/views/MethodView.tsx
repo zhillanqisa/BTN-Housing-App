@@ -3,7 +3,8 @@
 // Status tiap langkah dan sumber dihitung dari metadata dataset, bukan ditulis mati.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowCounterClockwise, ArrowRight, DownloadSimple, UploadSimple } from '@phosphor-icons/react'
-import { batasan, KONTEKS_URL, LABEL_KATEGORI, PRINSIP, TENORS, URUTAN_KATEGORI } from '../lib/config'
+import { batasan, LABEL_KATEGORI, PRINSIP, TENORS, URUTAN_KATEGORI } from '../lib/config'
+import { urlWilayah, wilayahById, type IdWilayah } from '../lib/wilayah'
 import { keDataset, unduhBerkas } from '../lib/data'
 import { fmt, fmtPeriode, fmtTanggal } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
@@ -41,7 +42,7 @@ type StatusPil =
 /** Catatan proses hanya dipercaya bila dataset memang ditandai hasil olahan. */
 const prosesOlahan = (meta: DatasetMeta | null) => (meta?.jenis === 'olahan' ? meta.proses : undefined)
 
-function susunAlur(meta: DatasetMeta | null): { judul: string; isi: string; status: StatusPil }[] {
+function susunAlur(meta: DatasetMeta | null, wilayah: IdWilayah): { judul: string; isi: string; status: StatusPil }[] {
   const p = prosesOlahan(meta)
   const olah: StatusPil = p ? 'Selesai' : meta?.jenis === 'demo' ? 'Rencana' : 'Tidak tercatat'
   const akhir: StatusPil = p ? 'Selesai' : meta?.jenis === 'demo' ? 'Sudah di demo' : 'Dipakai'
@@ -58,7 +59,7 @@ function susunAlur(meta: DatasetMeta | null): { judul: string; isi: string; stat
       judul: 'Koreksi atmosfer dan titik referensi stabil',
       isi: p
         ? `Koreksi atmosfer: ${p.koreksiAtmosfer || 'tidak dicatat'}. Titik referensi: ${p.referensi || 'tidak dicatat'}.`
-        : 'Gangguan atmosfer dikurangi. Acuan dipilih di area stabil dekat stasiun GNSS CSEM.',
+        : TEKS[wilayah].acuan,
       status: olah,
     },
     {
@@ -71,7 +72,7 @@ function susunAlur(meta: DatasetMeta | null): { judul: string; isi: string; stat
     },
     {
       judul: 'Validasi',
-      isi: 'Hasil dua lintasan satelit dibandingkan satu sama lain, diikat ke stasiun GNSS CSEM (Susilo dkk. 2023), dan dibandingkan dengan angka penelitian terdahulu.',
+      isi: TEKS[wilayah].validasi,
       status: p ? (p.validasi ? 'Selesai' : 'Rencana') : olah,
     },
     {
@@ -84,7 +85,60 @@ function susunAlur(meta: DatasetMeta | null): { judul: string; isi: string; stat
   ]
 }
 
-function susunSumber(meta: DatasetMeta | null, konteks: Partial<Record<JenisLapis, LapisKonteks>>): [string, string, StatusPil][] {
+/** Teks yang berbeda per wilayah: acuan GNSS, validasi, batasan, dan catatan sumber. */
+const TEKS: Record<IdWilayah, { acuan: string; validasi: string; gnss: string; batasan: string; cekSumber: string; gantiResmi: string; batas: string }> = {
+  semarang: {
+    acuan: 'Gangguan atmosfer dikurangi. Acuan dipilih di area stabil dekat stasiun GNSS CSEM.',
+    validasi: 'Hasil dua lintasan satelit dibandingkan satu sama lain, diikat ke stasiun GNSS CSEM (Susilo dkk. 2023), dan dibandingkan dengan angka penelitian terdahulu.',
+    gnss: 'Di Kota Semarang hanya ada satu stasiun GNSS terbuka, yaitu CSEM, dan letaknya di area stabil. Karena itu GNSS dipakai sebagai titik ikat. Area yang ambles diperiksa lewat kecocokan dua lintasan satelit yang saling independen dan lewat kisaran angka penelitian terdahulu.',
+    batasan: 'Validasi di Semarang bagian bawah masih terbatas karena stasiun GNSS acuan (CSEM) berada di area stabil.',
+    cekSumber:
+      'Sumber konteks dicek pada 13 dan 14 November 2026. RTRW Kota Semarang tidak bisa diambil: layanan GISTARU meminta token, sedangkan geoportal Pemkot dan Satu Peta BIG tidak merespons. Karena itu lapis pola ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Layanan peta geologi ESDM sedang pemeliharaan, jadi raster Peta Geologi Lembar Magelang dan Semarang diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Peta Geologi Kuarter Lembar Semarang 1:50.000 yang lebih rinci belum diolah.',
+    gantiResmi: 'Bila tim memperoleh RTRW Kota Semarang (Perda Nomor 14 Tahun 2011, diubah dengan Perda Nomor 5 Tahun 2021) atau peta geologi yang lebih rinci',
+    batas: 'Batas wilayah © OpenStreetMap contributors (ODbL).',
+  },
+  jakarta: {
+    acuan: 'Dataran Jakarta hampir datar, jadi koreksi atmosfer berbasis ketinggian tidak dipakai. Acuan dipilih di area stabil dekat stasiun GNSS CBTU.',
+    validasi: 'Hasil dua lintasan satelit dibandingkan satu sama lain, diikat ke stasiun GNSS CBTU, lalu dibandingkan dengan stasiun CJKT dan CTGR (Susilo dkk. 2023) serta angka penelitian terdahulu.',
+    gnss: 'Di Jakarta ada tiga stasiun GNSS terbuka. CBTU yang stabil dipakai sebagai titik ikat. CJKT dan CTGR tidak dipakai saat olah, sehingga menjadi pembanding independen. Ketiganya berada di area yang relatif stabil, jadi area ambles cepat di pesisir utara diperiksa lewat kecocokan dua lintasan satelit dan kisaran angka penelitian terdahulu.',
+    batasan: 'Stasiun GNSS terbuka di Jakarta berada di area relatif stabil; pesisir utara yang ambles cepat divalidasi lewat dua lintasan satelit.',
+    cekSumber:
+      'Sumber konteks dicek pada 14 November 2026. Lapis pola ruang memakai RDTR DKI Jakarta 2022 (Pergub 31/2022) dari layanan peta publik DPMPTSP DKI, dirapikan per zona. Raster Peta Geologi Lembar Jakarta dan Kepulauan Seribu diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi: warna tiap satuan diambil dari kotak legenda lembar itu sendiri.',
+    gantiResmi: 'Bila tim memperoleh peta geologi teknik atau data bor yang lebih rinci',
+    batas: 'Batas wilayah © OpenStreetMap contributors (ODbL).',
+  },
+  pekalongan: {
+    acuan: 'Gangguan atmosfer dikurangi dengan korelasi ketinggian di perbukitan selatan. Acuan diambil di tanah tinggi Kajen yang dianggap stabil, lalu disamakan dengan median area tinggi.',
+    validasi: 'Hasil dua lintasan satelit dibandingkan satu sama lain, lalu dibandingkan dengan stasiun GNSS CPKL di kota Pekalongan (Susilo dkk. 2023) yang tidak dipakai saat olah, serta angka penelitian terdahulu.',
+    gnss: 'Pekalongan tidak punya stasiun GNSS terbuka di area stabil. Stasiun CPKL justru berada di kota yang ambles cepat. Karena itu acuan diambil dari tanah tinggi di selatan, dan CPKL dipakai sebagai pembanding independen di area yang ambles.',
+    batasan: 'Acuan Pekalongan memakai tanah tinggi yang dianggap stabil, bukan stasiun GNSS. Bila tanah tinggi itu ikut bergerak, seluruh angka bergeser sebesar gerak itu.',
+    cekSumber:
+      'Sumber konteks dicek pada 14 November 2026. Lapis pola ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Raster Peta Geologi Lembar Banjarnegara dan Pekalongan diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Seluruh Kota Pekalongan berada di satuan Aluvium.',
+    gantiResmi: 'Bila tim memperoleh RTRW Kota Pekalongan atau data bor yang menunjukkan tebal endapan lunak',
+    batas: 'Batas wilayah: BPS 2020 lewat OCHA HDX (CC BY-IGO).',
+  },
+  demak: {
+    acuan: 'Gangguan atmosfer dikurangi dengan korelasi ketinggian di perbukitan. Acuan dipilih di area stabil dekat stasiun GNSS CSEM di Semarang.',
+    validasi: 'Hasil dua lintasan satelit dibandingkan satu sama lain, diikat ke stasiun GNSS CSEM (Susilo dkk. 2023), dan dibandingkan dengan angka penelitian terdahulu.',
+    gnss: 'Demak tidak punya stasiun GNSS terbuka sendiri. Titik ikat memakai CSEM di Semarang yang stabil dan masih masuk kotak olah. Pesisir Sayung yang ambles cepat diperiksa lewat kecocokan dua lintasan satelit dan kisaran angka penelitian terdahulu.',
+    batasan: 'Demak tidak punya stasiun GNSS pembanding; validasi bergantung pada kecocokan dua lintasan satelit.',
+    cekSumber:
+      'Sumber konteks dicek pada 14 November 2026. Lapis pola ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Raster Peta Geologi Lembar Kudus dan Lembar Salatiga diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Jalur sempit di barat 110°30′ BT diisi dari tepi lembar Kudus.',
+    gantiResmi: 'Bila tim memperoleh RTRW Kabupaten Demak atau data bor yang menunjukkan tebal endapan lunak',
+    batas: 'Batas wilayah: BPS 2020 lewat OCHA HDX (CC BY-IGO).',
+  },
+}
+
+/** Sumber konteks khusus tiap wilayah: pola ruang dan peta geologi. */
+const SUMBER_KONTEKS: Record<IdWilayah, { tataRuang: [string, string][]; peta: string; kuarter?: string }> = {
+  semarang: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)'], ['RTRW Kota Semarang (GISTARU, geoportal Pemkot)', 'Pola ruang rinci']], peta: 'Peta Geologi Lembar Magelang dan Semarang 1:100.000 (PSG)', kuarter: 'Peta Geologi Kuarter Lembar Semarang 1:50.000 (PSG)' },
+  jakarta: { tataRuang: [['RDTR DKI Jakarta 2022 (Pergub 31/2022), layanan DPMPTSP DKI', 'Lapis pola ruang (rinci)']], peta: 'Peta Geologi Lembar Jakarta dan Kepulauan Seribu 1:100.000 (PSG)' },
+  pekalongan: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)']], peta: 'Peta Geologi Lembar Banjarnegara dan Pekalongan 1:100.000 (PSG)' },
+  demak: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)']], peta: 'Peta Geologi Lembar Kudus dan Lembar Salatiga 1:100.000 (PSG)' },
+}
+
+function susunSumber(meta: DatasetMeta | null, konteks: Partial<Record<JenisLapis, LapisKonteks>>, wilayah: IdWilayah): [string, string, StatusPil][] {
+  const sk = SUMBER_KONTEKS[wilayah]
   const p = prosesOlahan(meta)
   const geologiResmi = konteks.geologi?.meta.jenis === 'resmi'
   return [
@@ -95,11 +149,10 @@ function susunSumber(meta: DatasetMeta | null, konteks: Partial<Record<JenisLapi
     ['GNSS CORS Pantura (Susilo dkk. 2023)', 'Titik ikat dan validasi', p?.validasi?.gnss?.length ? 'Dipakai' : 'Rencana'],
     ['DEM Copernicus GLO-30', geologiResmi ? 'Koreksi saat olah, dan cek batas satuan geologi' : 'Koreksi saat olah, dan perkiraan satuan geologi', p || konteks.geologi ? 'Dipakai' : 'Rencana'],
     // Baris berikut: hasil cek layanan publik pada 13 dan 14 November 2026 (lihat catatan di bawah tabel).
-    ['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)', konteks.rtrw ? 'Dipakai' : 'Rencana'],
-    ['RTRW Kota Semarang (GISTARU, geoportal Pemkot)', 'Pola ruang rinci', 'Tidak tersedia terbuka'],
-    ['Peta Geologi Lembar Magelang dan Semarang 1:100.000 (PSG)', 'Lapis geologi, didigitasi tim', geologiResmi ? 'Dipakai' : 'Perlu akun'],
-    ...(geologiResmi ? [] : [['Satuan geologi dari bentuk lahan', 'Lapis geologi sementara', konteks.geologi ? 'Perkiraan' : 'Rencana'] as [string, string, StatusPil]]),
-    ['Peta Geologi Kuarter Lembar Semarang 1:50.000 (PSG)', 'Rincian endapan muda', 'Perlu akun'],
+    ...sk.tataRuang.map(([a, b], i): [string, string, StatusPil] => [a, b, i === 0 ? (konteks.rtrw ? 'Dipakai' : 'Rencana') : 'Tidak tersedia terbuka']),
+    [sk.peta, 'Lapis geologi, didigitasi tim', geologiResmi ? 'Dipakai' : 'Perlu akun'],
+    ...(geologiResmi ? [] : [['Satuan geologi dari bentuk lahan', 'Lapis geologi sementara', konteks.geologi ? 'Perkiraan' : 'Tidak tersedia terbuka'] as [string, string, StatusPil]]),
+    ...(sk.kuarter ? [[sk.kuarter, 'Rincian endapan muda', 'Perlu akun'] as [string, string, StatusPil]] : []),
     ['Bahaya banjir dan abrasi (InaRISK BNPB)', 'Konteks rob', 'Lisensi belum jelas'],
   ]
 }
@@ -162,7 +215,7 @@ function ringkasGeologi(lapis: LapisKonteks): string | null {
   return `Median laju di Aluvium ${fmt(Math.max(0, a.median), 1)} cm/tahun dan ${persen(a.porsiTinggi ?? 0)} pikselnya turun minimal 4 cm/tahun. Di ${lain.length === 1 ? 'satuan batuan lain' : `${lain.length} satuan batuan lainnya`}, median paling tinggi ${fmt(Math.max(0, medLain), 1)} cm/tahun dan piksel yang turun secepat itu paling banyak ${persen(porsiLain)}.`
 }
 
-function BagianKonteks({ konteks }: { konteks: Partial<Record<JenisLapis, LapisKonteks>> }) {
+function BagianKonteks({ konteks, wilayah }: { konteks: Partial<Record<JenisLapis, LapisKonteks>>; wilayah: IdWilayah }) {
   const ada = JENIS_LAPIS.filter((j) => konteks[j])
   return (
     <>
@@ -217,7 +270,7 @@ function BagianKonteks({ konteks }: { konteks: Partial<Record<JenisLapis, LapisK
                 ))}
               </ul>
             )}
-            <a href={KONTEKS_URL[j]} download className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink underline underline-offset-2">
+            <a href={urlWilayah(wilayah).konteks[j]} download className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink underline underline-offset-2">
               <DownloadSimple size={15} aria-hidden="true" />
               Unduh lapis ini (GeoJSON)
             </a>
@@ -227,8 +280,7 @@ function BagianKonteks({ konteks }: { konteks: Partial<Record<JenisLapis, LapisK
       <div className="border-t border-line pt-4 text-[13.5px]">
         <h3 className="text-[16px] font-bold text-ink">Mengganti dengan data resmi</h3>
         <p className="mt-1">
-          Kedua lapis disimpan juga sebagai shapefile di folder <code className="font-mono text-[12.5px] text-ink">data-raw/konteks</code> pada repositori. Bila tim memperoleh RTRW Kota Semarang (Perda Nomor 14
-          Tahun 2011, diubah dengan Perda Nomor 5 Tahun 2021) atau hasil digitasi peta geologi Pusat Survei Geologi, jalankan{' '}
+          Lapis disimpan juga sebagai shapefile di folder <code className="font-mono text-[12.5px] text-ink">data-raw/konteks</code> pada repositori. {TEKS[wilayah].gantiResmi}, jalankan{' '}
           <code className="font-mono text-[12.5px] text-ink">pipeline/07_konteks.py --rtrw</code> atau <code className="font-mono text-[12.5px] text-ink">--geologi</code> dengan file itu. Statistik dan peta ikut
           diperbarui.
         </p>
@@ -493,8 +545,9 @@ export default function MethodView() {
   const memadai = kawasan.filter((k) => k.memadai).length
   const titik = !!grid
   const lebarBlok = lebarBlokM(grid)
-  const alur = susunAlur(meta)
-  const sumber = susunSumber(meta, konteks)
+  const wilayah = useApp((s) => s.wilayah)
+  const alur = susunAlur(meta, wilayah)
+  const sumber = susunSumber(meta, konteks, wilayah)
   // tautan dari legenda peta: #/metode?bagian=konteks
   const bagian = rute.params.get('bagian')
   useEffect(() => {
@@ -513,8 +566,8 @@ export default function MethodView() {
   return (
     <div className="mx-auto w-full max-w-[1240px] px-4 pb-20 pt-2 md:px-8">
       <h1 className="text-[28px] font-bold tracking-tight text-ink md:text-[34px]">Data & metode</h1>
-      <p className="mt-1 max-w-[65ch] text-[15px] text-ink-2">Dari mana angkanya, cara membacanya, dan apa batasannya.</p>
-      <nav aria-label="Bagian halaman" className="mt-5 flex flex-wrap gap-2">
+      <p className="mt-1 max-w-[65ch] text-[15px] text-ink-2">Dari mana angkanya, cara membacanya, dan apa batasannya, untuk {wilayahById(wilayah)?.nama}.</p>
+      <nav aria-label="Bagian halaman" className="hp-tanpa-gulir -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
         {BAGIAN.map(([id, label]) => (
           <Chip key={id} onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
             {label}
@@ -690,19 +743,16 @@ export default function MethodView() {
             </table>
           </div>
           <p className="text-[13px]">
-            Sumber konteks dicek pada 13 dan 14 November 2026. RTRW Kota Semarang tidak bisa diambil: layanan GISTARU meminta token, sedangkan geoportal Pemkot dan Satu Peta BIG tidak merespons. Karena itu lapis pola
-            ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Layanan peta geologi ESDM sedang pemeliharaan, jadi raster Peta Geologi Lembar Magelang dan Semarang diunduh tim dari
-            GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Peta Geologi Kuarter Lembar Semarang 1:50.000 yang lebih rinci belum diolah. Layanan InaRISK BNPB bisa diakses publik, tetapi tidak
-            mencantumkan lisensi pemakaian ulang dan tidak punya lapis genangan rob khusus.
+            {TEKS[wilayah].cekSumber} Layanan InaRISK BNPB bisa diakses publik, tetapi tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis genangan rob khusus.
           </p>
           <p className="text-[13px]">
             Elevasi tidak ditampilkan sebagai konteks. Galat DEM global beberapa meter, terlalu kasar untuk menilai rob di pesisir yang tingginya hanya satu sampai tiga meter di atas laut.
           </p>
-          <p className="text-[13px]">Batas wilayah © OpenStreetMap contributors (ODbL). Peta dasar OpenFreeMap © OpenMapTiles, data OpenStreetMap.</p>
+          <p className="text-[13px]">{TEKS[wilayah].batas} Peta dasar OpenFreeMap © OpenMapTiles, data OpenStreetMap.</p>
         </Bagian>
 
         <Bagian id="konteks" judul="Lapis konteks: tata ruang dan geologi">
-          <BagianKonteks konteks={konteks} />
+          <BagianKonteks konteks={konteks} wilayah={wilayah} />
         </Bagian>
 
         <Bagian id="validasi" judul="Validasi">
@@ -721,9 +771,14 @@ export default function MethodView() {
                 )}
                 {validasi.gnss?.map((g) => (
                   <div key={g.stasiun} className="contents">
-                    <dt className="text-ink-3">Stasiun GNSS {g.stasiun}</dt>
+                    <dt className="text-ink-3">
+                      Stasiun GNSS {g.stasiun}
+                      {g.peran ? ` (${g.peran})` : ''}
+                    </dt>
                     <dd className="text-ink">
-                      GNSS {fmt(g.gnss, 2)} cm/tahun, InSAR {fmt(g.insar, 2)} cm/tahun, selisih {fmt(Math.abs(g.gnss - g.insar), 2)} cm/tahun
+                      {g.insar == null
+                        ? `GNSS ${fmt(g.gnss, 2)} cm/tahun; InSAR tidak terukur di stasiun ini (di luar cakupan citra atau koherensi rendah)`
+                        : `GNSS ${fmt(g.gnss, 2)} cm/tahun, InSAR ${fmt(g.insar, 2)} cm/tahun, selisih ${fmt(Math.abs(g.gnss - g.insar), 2)} cm/tahun`}
                     </dd>
                   </div>
                 ))}
@@ -736,10 +791,7 @@ export default function MethodView() {
               satelit dan perbandingan dengan stasiun GNSS.
             </p>
           )}
-          <p>
-            Di Kota Semarang hanya ada satu stasiun GNSS terbuka, yaitu CSEM, dan letaknya di area stabil. Karena itu GNSS dipakai sebagai titik ikat. Area yang ambles diperiksa lewat kecocokan dua lintasan satelit yang
-            saling independen dan lewat kisaran angka penelitian terdahulu.
-          </p>
+          <p>{TEKS[wilayah].gnss}</p>
         </Bagian>
 
         <Bagian id="batasan" judul="Batasan">
@@ -748,7 +800,7 @@ export default function MethodView() {
               <li key={b}>{b}</li>
             ))}
             <li>Piksel yang hanya terukur dari satu lintasan satelit memakai asumsi gerak dominan vertikal.</li>
-            <li>Validasi di Semarang bagian bawah masih terbatas karena stasiun GNSS acuan (CSEM) berada di area stabil.</li>
+            <li>{TEKS[wilayah].batasan}</li>
             <li>Piksel atau kawasan yang tidak terukur ditandai data tidak memadai, bukan dianggap aman.</li>
           </ul>
           <p className="font-semibold text-ink">{PRINSIP}</p>

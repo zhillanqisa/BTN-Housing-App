@@ -1,6 +1,5 @@
 // Muat, validasi, dan indeks dataset kawasan (agregat per kelurahan).
 // Format file: GeoJSON FeatureCollection + anggota "metadata" (lihat types.ts).
-import { DATA_URL } from './config'
 import { areaKm2, bboxOf, inBBox, pointInGeometry, pusatOf } from './geo'
 import type { Dataset, DatasetMeta, Kawasan, KawasanFeature, KawasanGeometry, Position, ProsesMeta, ValidasiProses } from './types'
 
@@ -64,7 +63,8 @@ function bacaProses(raw: unknown): ProsesMeta | undefined {
         ? v.gnss.filter(isObj).flatMap((g) => {
             const gnss = angka(g.gnss)
             const insar = angka(g.insar)
-            return gnss != null && insar != null ? [{ stasiun: String(g.stasiun ?? ''), gnss, insar }] : []
+            const peran = g.peran === 'titik ikat' || g.peran === 'pembanding' ? g.peran : undefined
+            return gnss != null ? [{ stasiun: String(g.stasiun ?? ''), peran, gnss, insar }] : []
           })
         : undefined,
       lulus: v.lulus === true,
@@ -240,10 +240,14 @@ export function unduhBerkas(nama: string, isi: string | Blob, mime = 'text/plain
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export async function ambilDatasetDemo(): Promise<Dataset> {
-  const res = await fetch(DATA_URL)
+export async function ambilDatasetDemo(url: string): Promise<Dataset> {
+  const res = await fetch(url)
   if (!res.ok) throw new Error(`Gagal memuat data (${res.status}).`)
-  const hasil = validasiDataset(await res.json(), { ...META_BAWAAN, jenis: 'demo', judul: 'Data demo' })
+  const json: unknown = await res.json()
+  // kerangka kelurahan dari scripts/siapkan-kawasan.mjs: batas sudah ada, angka belum
+  const meta = (json as { metadata?: { judul?: unknown } } | null)?.metadata
+  if (meta?.judul === 'Belum diolah') throw new Error('Data wilayah ini belum selesai diolah.')
+  const hasil = validasiDataset(json, { ...META_BAWAAN, jenis: 'demo', judul: 'Data demo' })
   if (!hasil.ok) throw new Error(hasil.galat.join(' '))
   return hasil.dataset
 }

@@ -5,6 +5,7 @@ import { MapTrifold, Trash } from '@phosphor-icons/react'
 import { MAKS_BANDING, TENORS } from '../lib/config'
 import { fmt } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
+import { useLayarKecil } from '../lib/layar'
 import { bacaLokasi, kunciTitik, type Bacaan } from '../lib/lokasi'
 import { hitungProyeksi, kalimatStatus, klasifikasi, teksLaju, teksProyeksi } from '../lib/risk'
 import { navigasi } from '../lib/router'
@@ -26,34 +27,64 @@ function skalaRapi(maks: number): number {
   return Math.ceil(maks / 100) * 100
 }
 
-function GrafikRentang({ baris, tenor }: { baris: Baris[]; tenor: number }) {
+/** Garis bantu pada kelipatan 5 yang rapi: 4, 5, atau 3 bagian. */
+function tikRapi(maks: number): number[] {
+  const n = [4, 5, 3].find((b) => (maks / b) % 5 === 0) ?? 4
+  return Array.from({ length: n + 1 }, (_, i) => (maks / n) * i)
+}
+
+/** sempit=true (ponsel): nama lokasi di atas batangnya, supaya grafik muat selebar layar tanpa digeser. */
+function GrafikRentang({ baris, tenor, sempit }: { baris: Baris[]; tenor: number; sempit: boolean }) {
   const maks = skalaRapi(Math.max(20, ...baris.map((b) => b.p?.atas ?? 0)))
-  const kiri = 172
-  const kanan = 548
+  const lebar = sempit ? 340 : 640
+  const kiri = sempit ? 10 : 172
+  const kanan = sempit ? 306 : 548
+  const tinggiBaris = sempit ? 54 : 40
   const x = (cm: number) => kiri + (cm / maks) * (kanan - kiri)
-  const tinggi = baris.length * 40 + 30
+  const tinggi = baris.length * tinggiBaris + 30
   return (
-    <svg viewBox={`0 0 640 ${tinggi}`} className="block w-full" role="img" aria-label={`Rentang proyeksi penurunan selama ${tenor} tahun untuk ${baris.length} lokasi, dalam cm`}>
+    <svg viewBox={`0 0 ${lebar} ${tinggi}`} className="block w-full" role="img" aria-label={`Rentang proyeksi penurunan selama ${tenor} tahun untuk ${baris.length} lokasi, dalam cm`}>
       <defs>
         <pattern id="arsir-banding" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="6" height="6" fill="var(--nodata)" />
           <line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink-3)" strokeWidth="1.2" />
         </pattern>
       </defs>
-      {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-        <g key={f}>
-          <line x1={x(maks * f)} x2={x(maks * f)} y1={4} y2={tinggi - 22} stroke="var(--line)" strokeWidth={1} />
-          <text x={x(maks * f)} y={tinggi - 6} textAnchor="middle" fontSize={11} fill="var(--ink-3)" className="tnum">
-            {fmt(maks * f)}
+      {tikRapi(maks).map((v) => (
+        <g key={v}>
+          <line x1={x(v)} x2={x(v)} y1={4} y2={tinggi - 22} stroke="var(--line)" strokeWidth={1} />
+          <text x={x(v)} y={tinggi - 6} textAnchor="middle" fontSize={11} fill="var(--ink-3)" className="tnum">
+            {fmt(v)}
           </text>
         </g>
       ))}
-      <text x={kanan + 10} y={tinggi - 6} fontSize={11} fill="var(--ink-3)">
+      <text x={kanan + (sempit ? 14 : 10)} y={tinggi - 6} fontSize={11} fill="var(--ink-3)">
         cm
       </text>
       {baris.map(({ kunci, t, p }, i) => {
-        const y = 12 + i * 40
         const nama = t.label
+        if (sempit) {
+          const y = 8 + i * tinggiBaris
+          return (
+            <g key={kunci} tabIndex={0} className="outline-offset-2" aria-label={p ? `${nama}: ${teksProyeksi(p)}, nilai tengah ${fmt(p.tengah)} cm` : `${nama}: data tidak memadai`}>
+              <text x={kiri} y={y + 12} fontSize={13} fontWeight={600} fill="var(--ink)">
+                {nama.length > 30 ? `${nama.slice(0, 29)}...` : nama}
+              </text>
+              <text x={lebar - 4} y={y + 12} textAnchor="end" fontSize={12.5} fontWeight={700} fill="var(--ink)">
+                {p ? teksProyeksi(p) : 'tidak memadai'}
+              </text>
+              {p ? (
+                <>
+                  <rect x={x(p.bawah)} y={y + 22} width={Math.max(3, x(p.atas) - x(p.bawah))} height={12} rx={6} fill="var(--data)" opacity={0.28} />
+                  <circle cx={x(p.tengah)} cy={y + 28} r={5} fill="var(--data)" stroke="var(--surface)" strokeWidth={2} />
+                </>
+              ) : (
+                <rect x={kiri} y={y + 22} width={120} height={12} rx={6} fill="url(#arsir-banding)" />
+              )}
+            </g>
+          )
+        }
+        const y = 12 + i * 40
         return (
           <g key={kunci} tabIndex={0} className="outline-offset-2" aria-label={p ? `${nama}: ${teksProyeksi(p)}, nilai tengah ${fmt(p.tengah)} cm` : `${nama}: data tidak memadai`}>
             <title>{p ? `${nama}: bawah ${fmt(p.bawah)} cm, tengah ${fmt(p.tengah)} cm, atas ${fmt(p.atas)} cm` : `${nama}: data tidak memadai`}</title>
@@ -96,6 +127,7 @@ export default function CompareView() {
   const kosongkan = useApp((s) => s.kosongkanBanding)
   const pilihTitik = useApp((s) => s.pilihTitik)
   const jenis = useApp((s) => s.meta?.jenis)
+  const sempit = useLayarKecil()
 
   const titik = !!grid
   const baris = useMemo<Baris[]>(
@@ -142,12 +174,12 @@ export default function CompareView() {
         </Notice>
       )}
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
+      <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap sm:items-end">
         <div>
           <div className="mb-1.5 text-[12.5px] font-medium text-ink-3">Tenor KPR</div>
           <Segmented label="Tenor KPR" nilai={tenor} onUbah={setTenor} opsi={TENORS.map((t) => ({ nilai: t, label: `${t} tahun` }))} />
         </div>
-        <div className="min-w-[220px]">
+        <div className="min-w-0 sm:min-w-[220px]">
           <label htmlFor="tambah-kawasan" className="mb-1.5 block text-[12.5px] font-medium text-ink-3">
             {titik ? 'Tambah pusat kelurahan' : 'Tambah kawasan'} {penuh ? `(maksimal ${MAKS_BANDING})` : ''}
           </label>
@@ -171,7 +203,7 @@ export default function CompareView() {
           </select>
         </div>
         {baris.length > 0 && (
-          <Button varian="ghost" onClick={kosongkan} ikon={<Trash size={17} />}>
+          <Button varian="ghost" className="justify-self-start" onClick={kosongkan} ikon={<Trash size={17} />}>
             Kosongkan
           </Button>
         )}
@@ -201,7 +233,7 @@ export default function CompareView() {
 
       {baris.length > 0 && (
         <>
-          <div className={cx('mt-6 grid gap-4', baris.length === 1 ? 'md:grid-cols-1' : baris.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3')}>
+          <div className={cx('mt-6 grid grid-cols-1 gap-4', baris.length === 1 ? 'md:grid-cols-1' : baris.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3')}>
             {baris.map(({ kunci, t, b }) => {
               const k = b.data
               const kat = klasifikasi(k.laju, k.memadai, thresholds)
@@ -251,9 +283,9 @@ export default function CompareView() {
           <Card className="mt-4 p-5">
             <JudulBagian>Proyeksi selama {tenor} tahun</JudulBagian>
             <p className="mt-1 text-[12.5px] text-ink-3">Batang = rentang dari ketidakpastian laju. Titik = nilai tengah.</p>
-            <div className="mt-3 overflow-x-auto">
-              <div className="min-w-[520px]">
-                <GrafikRentang baris={baris} tenor={tenor} />
+            <div className={cx('mt-3', !sempit && 'overflow-x-auto')}>
+              <div className={cx(!sempit && 'min-w-[520px]')}>
+                <GrafikRentang baris={baris} tenor={tenor} sempit={sempit} />
               </div>
             </div>
             {berdata.length >= 2 && terendah && tertinggi && (

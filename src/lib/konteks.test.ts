@@ -1,7 +1,7 @@
 // Tes lapis konteks: validasi file, pencarian kelas di titik, dan statistik.
 import { describe, expect, it } from 'vitest'
-import geologiMentah from '../../public/data/konteks-geologi.geojson?raw'
-import rtrwMentah from '../../public/data/konteks-rtrw.geojson?raw'
+import geologiMentah from '../../public/data/semarang-konteks-geologi.geojson?raw'
+import rtrwMentah from '../../public/data/semarang-konteks-rtrw.geojson?raw'
 import { KODE_ALUVIUM, konteksDi, statKelas, validasiKonteks } from './konteks'
 import type { Position } from './types'
 

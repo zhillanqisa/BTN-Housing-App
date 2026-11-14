@@ -12,8 +12,10 @@ import { fmt } from '../lib/format'
 import { mergeBBox, polygonsOf } from '../lib/geo'
 import { batasBlok, lukisGrid, nilaiDi, type Grid, type RGBA } from '../lib/grid'
 import { JENIS_LAPIS, konteksDi, LABEL_LAPIS, type JenisLapis, type LapisKonteks } from '../lib/konteks'
+import { layarKecil, PECAHAN_SEDANG } from '../lib/layar'
 import { binLaju, klasifikasi } from '../lib/risk'
 import { jembatanPeta, kawasanById, useApp } from '../lib/store'
+import { wilayahById, wilayahDiTitik } from '../lib/wilayah'
 import type { BBox, Kawasan, ModePeta, Position, Tema, Thresholds } from '../lib/types'
 import { Notice } from '../ui/primitives'
 
@@ -159,10 +161,12 @@ function gayaCadangan(tema: Tema): StyleSpecification {
   }
 }
 
-/** Ruang kosong supaya titik fokus tidak tertutup panel. */
-function bantalan(): PaddingOptions {
-  if (window.innerWidth >= 1024) return { left: 440, top: 96, right: 76, bottom: 56 }
-  return { left: 24, top: 150, right: 24, bottom: Math.round(window.innerHeight * 0.45) }
+/** Ruang kosong supaya titik fokus tidak tertutup panel. laporan=true: di ponsel, lembar laporan
+ *  menutup bagian bawah layar (posisi sedang), jadi titik ditaruh di peta yang masih terlihat. */
+function bantalan(laporan = false): PaddingOptions {
+  if (!layarKecil()) return { left: 440, top: 96, right: 76, bottom: 56 }
+  const bawah = laporan ? Math.round(window.innerHeight * PECAHAN_SEDANG) : 230
+  return { left: 24, top: 150, right: 64, bottom: Math.min(bawah, window.innerHeight - 260) }
 }
 
 interface Ringkas {
@@ -178,15 +182,31 @@ interface Ringkas {
 
 const opasitasGrid = (s: Ringkas) => OPASITAS_GRID[s.lapisKonteks ? 'konteks' : 'biasa'][s.tema]
 
+// data terakhir yang dipasang ke tiap sumber lapis konteks (berganti saat pindah wilayah)
+const dataKonteks = new Map<string, unknown>()
+
 /** Lapis konteks (pola ruang, geologi): pasang yang sudah termuat, tampilkan hanya yang dipilih. */
 function terapkanKonteks(map: PetaGL, s: Ringkas): void {
   if (!map.getLayer(L_ISI)) return
   const gelap = s.tema === 'dark'
   for (const j of JENIS_LAPIS) {
     const l = s.konteks[j]
-    if (!l) continue
     const src = srcKonteks(j)
-    if (!map.getSource(src)) map.addSource(src, { type: 'geojson', data: l.geojson as GeoJSONSourceSpecification['data'] })
+    if (!l) {
+      // wilayah ini tidak punya lapis tersebut: kosongkan bila sumbernya pernah dipasang
+      if (map.getSource(src) && dataKonteks.get(src) !== KOSONG) {
+        ;(map.getSource(src) as GeoJSONSource).setData(KOSONG)
+        dataKonteks.set(src, KOSONG)
+      }
+      continue
+    }
+    if (!map.getSource(src)) {
+      map.addSource(src, { type: 'geojson', data: l.geojson as GeoJSONSourceSpecification['data'] })
+      dataKonteks.set(src, l.geojson)
+    } else if (dataKonteks.get(src) !== l.geojson) {
+      ;(map.getSource(src) as GeoJSONSource).setData(l.geojson as GeoJSONSourceSpecification['data'] as never)
+      dataKonteks.set(src, l.geojson)
+    }
     // di bawah lapis redup, supaya sorotan kelurahan tetap bekerja
     const sebelum = map.getLayer(L_REDUP) ? L_REDUP : undefined
     if (!map.getLayer(lIsiKonteks(j))) {
@@ -356,7 +376,8 @@ export default function MapView({ aktif }: { aktif: boolean }) {
   const labelKel = useRef<Marker | null>(null)
   const temaTerpasang = useRef<Tema>(useApp.getState().tema)
   const modeCadangan = useRef(false)
-  const sudahPas = useRef(false)
+  // wilayah yang terakhir dipaskan ke layar: peta dipaskan ulang saat pindah wilayah
+  const wilayahPas = useRef<string | null>(null)
   const terbangTerakhir = useRef('')
   const [gayaKe, setGayaKe] = useState(0)
   const [cadangan, setCadangan] = useState(false)
@@ -371,6 +392,7 @@ export default function MapView({ aktif }: { aktif: boolean }) {
   const selection = useApp((s) => s.selection)
   const konteks = useApp((s) => s.konteks)
   const lapisKonteks = useApp((s) => s.lapisKonteks)
+  const wilayah = useApp((s) => s.wilayah)
 
   // ---------- inisialisasi (sekali) ----------
   useEffect(() => {
@@ -481,7 +503,12 @@ export default function MapView({ aktif }: { aktif: boolean }) {
     map.on('mouseleave', L_ISI, lepas)
 
     map.on('click', (e) => {
-      useApp.getState().pilihTitik([e.lngLat.lng, e.lngLat.lat], 'peta')
+      const st = useApp.getState()
+      const p: Position = [e.lngLat.lng, e.lngLat.lat]
+      // klik di wilayah lain: pindah wilayah dulu, lalu pilih titiknya
+      const w = wilayahDiTitik(p)
+      if (w && w.id !== st.wilayah) void st.pilihWilayah(w.id).then(() => useApp.getState().pilihTitik(p, 'peta'))
+      else st.pilihTitik(p, 'peta')
     })
 
     // jembatan untuk kontrol dan PDF
@@ -542,11 +569,15 @@ export default function MapView({ aktif }: { aktif: boolean }) {
     const src = map?.getSource(SRC) as GeoJSONSource | undefined
     if (!map || !src) return
     src.setData(geojsonPeta(kawasan))
-    if (!sudahPas.current && kawasan.length) {
-      sudahPas.current = true
-      const kotak = mergeBBox(kawasan.map((k) => k.bbox))
+    const w = useApp.getState().wilayah
+    // data kosong (gagal muat) tetap memindah kamera ke kotak wilayah, supaya peta tidak tertinggal di wilayah lama
+    const gagal = !kawasan.length && useApp.getState().status === 'gagal'
+    if (wilayahPas.current !== w && (kawasan.length || gagal)) {
+      const pertama = wilayahPas.current === null
+      wilayahPas.current = w
+      const kotak = kawasan.length ? mergeBBox(kawasan.map((k) => k.bbox)) : (wilayahById(w)?.bbox ?? null)
       if (kotak && !useApp.getState().selection) {
-        map.fitBounds([[kotak[0], kotak[1]], [kotak[2], kotak[3]]], { padding: bantalan(), pitch: tigaD ? MAP.pitch : 0, bearing: MAP.bearing, duration: 0 })
+        map.fitBounds([[kotak[0], kotak[1]], [kotak[2], kotak[3]]], { padding: bantalan(), pitch: tigaD ? MAP.pitch : 0, bearing: MAP.bearing, duration: pertama ? 0 : 1600 })
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -623,7 +654,7 @@ export default function MapView({ aktif }: { aktif: boolean }) {
       terbangTerakhir.current = kunci
       const pusat: Position = selection.lngLat
       // dengan grid, perbesar sampai blok sekitar 240 m terlihat jelas
-      map.flyTo({ center: pusat, zoom: Math.max(map.getZoom(), grid ? 14.6 : 13.7), pitch: tigaD ? 58 : 0, padding: bantalan(), duration: 1500 })
+      map.flyTo({ center: pusat, zoom: Math.max(map.getZoom(), grid ? 14.6 : 13.7), pitch: tigaD ? 58 : 0, padding: bantalan(true), duration: 1500 })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection, grid, gayaKe])
@@ -631,7 +662,7 @@ export default function MapView({ aktif }: { aktif: boolean }) {
   return (
     <div className="absolute inset-0" inert={!aktif}>
       {/* h-full, bukan absolute: CSS MapLibre memaksa position: relative pada kontainer */}
-      <div ref={wadah} className="h-full w-full" aria-label="Peta penurunan tanah Kota Semarang" />
+      <div ref={wadah} className="h-full w-full" aria-label={`Peta penurunan tanah ${wilayahById(wilayah)?.nama ?? ''}`} />
       {cadangan && aktif && (
         <div className="pointer-events-none absolute inset-x-0 top-[150px] z-10 flex justify-center px-4 lg:top-[92px]">
           <Notice className="pointer-events-auto max-w-[420px] shadow-pop">

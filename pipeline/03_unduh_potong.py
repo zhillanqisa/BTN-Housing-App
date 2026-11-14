@@ -26,7 +26,7 @@ from pathlib import Path
 import hyp3_sdk as sdk
 from osgeo import gdal, osr
 
-from umum import AOI_KOTA, BANTALAN_M, EPSG_UTM, KERJA, LINTASAN, PIKSEL_M, PROYEK_HYP3, dir_lintasan
+from umum import AOI_KOTA, BANTALAN_M, EPSG_UTM, KERJA, LINTASAN, PIKSEL_M, PROYEK_HYP3, TITIK_KOTAK, dir_lintasan
 
 gdal.UseExceptions()
 
@@ -37,7 +37,7 @@ PITA_GEOM = ("dem", "lv_theta", "lv_phi", "water_mask")
 
 
 def kotak_utm() -> tuple[float, float, float, float]:
-    """Kotak batas kota dalam UTM (xmin, ymin, xmax, ymax), diberi bantalan dan dibulatkan keluar ke kelipatan piksel."""
+    """Kotak batas wilayah (ditambah titik ikat dan stasiun pembanding) dalam UTM, diberi bantalan dan dibulatkan keluar ke kelipatan piksel."""
     gj = json.loads(AOI_KOTA.read_text(encoding="utf-8"))
     lon: list[float] = []
     lat: list[float] = []
@@ -52,6 +52,10 @@ def kotak_utm() -> tuple[float, float, float, float]:
 
     for f in gj["features"]:
         kumpul(f["geometry"]["coordinates"])
+    # titik ikat dan stasiun GNSS pembanding harus ikut terpotong
+    for lat_t, lon_t in TITIK_KOTAK:
+        lon.append(lon_t)
+        lat.append(lat_t)
     wgs = osr.SpatialReference()
     wgs.ImportFromEPSG(4326)
     wgs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)

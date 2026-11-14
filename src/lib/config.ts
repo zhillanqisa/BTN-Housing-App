@@ -44,9 +44,10 @@ export const MAP = {
   bearing: -14,
   minZoom: 9.5,
   maxZoom: 17.5,
+  // cukup luas untuk semua wilayah di pesisir utara Jawa (Jakarta sampai Demak)
   maxBounds: [
-    [109.95, -7.4],
-    [110.9, -6.7],
+    [105.9, -7.7],
+    [111.6, -5.6],
   ] as [Position, Position],
   styles: {
     light: 'https://tiles.openfreemap.org/styles/positron',
@@ -62,13 +63,6 @@ export const NOMINATIM = {
   viewbox: '110.26,-6.92,110.52,-7.12',
 } as const
 
-export const DATA_URL = `${import.meta.env.BASE_URL}data/semarang-kawasan.geojson`
-export const GRID_URL = `${import.meta.env.BASE_URL}data/semarang-grid.json`
-/** Lapis konteks (pipeline/07_konteks.py). */
-export const KONTEKS_URL = {
-  rtrw: `${import.meta.env.BASE_URL}data/konteks-rtrw.geojson`,
-  geologi: `${import.meta.env.BASE_URL}data/konteks-geologi.geojson`,
-} as const
 export const MAKS_BANDING = 3
 
 /** ASUMSI: laporan titik dihitung dari blok BLOK_PIKSEL x BLOK_PIKSEL piksel di sekitar titik

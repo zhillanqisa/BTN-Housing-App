@@ -4,7 +4,47 @@ Mengolah citra Sentinel-1 menjadi file yang dibaca aplikasi: grid piksel (`publi
 
 Alur: katalog ASF, interferogram di ASF HyP3, deret waktu SBAS di MintPy, gabung dua lintasan menjadi gerak vertikal, validasi, ekspor.
 
-## Status
+## Wilayah
+
+Semua skrip membaca wilayah dari variabel lingkungan `PA_WILAYAH` (bawaan `semarang`). Pengaturan tiap wilayah (lintasan, stasiun acuan, pembanding, koreksi troposfer, area stabil) ada di `KONFIG` di `umum.py`. Folder kerja: `<PA_OLAH>/kerja` untuk Semarang, `<PA_OLAH>/kerja-<wilayah>` untuk wilayah lain.
+
+```bash
+PA_WILAYAH=jakarta python pipeline/01_cari_pasangan.py --lintasan asc
+# ... langkah 2 sampai 6 sama seperti di bawah, semuanya dengan PA_WILAYAH yang sama
+PA_WILAYAH=jakarta python pipeline/07b_geologi_lembar.py   # Semarang: 07a_digitasi_geologi.py
+PA_WILAYAH=jakarta python pipeline/07_konteks.py
+node scripts/ringkasan-wilayah.mjs                         # kartu perbandingan di Dashboard
+```
+
+| Wilayah | Lintasan | Acuan | Pembanding | Koreksi troposfer |
+|---|---|---|---|---|
+| semarang | desc 76, asc 127 | GNSS CSEM | - | perbukitan > 80 m |
+| jakarta | desc 47, asc 98 | GNSS CBTU (Bekasi) | GNSS CJKT, CTGR | tidak (dataran) |
+| pekalongan | desc 76, asc 25 | tanah tinggi Kajen, lalu diikat ulang ke median area > 90 m | GNSS CPKL | perbukitan > 90 m |
+| demak | desc 76, asc 127 | GNSS CSEM | - | perbukitan > 80 m |
+
+### Hasil Jakarta (14 November 2026)
+
+| Ukuran | Nilai |
+|---|---|
+| Interferogram | 698 ascending (205 citra), 358 descending (110 citra) |
+| Piksel DKI terukur | 95% (96.459 dari 101.479) |
+| Selisih ascending dan descending | RMSE 0,45 cm/tahun, bias 0,42, korelasi 0,954 |
+| GNSS CJKT (pembanding, Jakarta Utara) | GNSS 0,51, InSAR 0,92 cm/tahun |
+| GNSS CTGR (pembanding, Tangerang) | GNSS 0,08, InSAR 0,22 cm/tahun |
+| Laju tertinggi | 7,9 cm/tahun per piksel (Muara Angke); kelurahan tertinggi Pluit dan Kamal Muara 1,9 cm/tahun |
+| Gerbang mutu | lulus |
+
+### Temuan saat olah wilayah baru
+
+1. **Stasiun acuan di piksel yang tidak tersambung.** CBTU jatuh di piksel yang komponen tersambungnya nol di sebagian interferogram, dan MintPy menolak titik itu. `04_mintpy.py` sekarang memindah acuan ke piksel andal terdekat (paling jauh 6 piksel). Karena pilihan asc dan desc bisa berbeda, `05_vertikal_validasi.py` mengikat ulang kedua lintasan ke satu piksel yang andal di keduanya.
+2. **`waterMask.h5` belum ada pada olahan pertama.** Di Semarang berkas itu tersisa dari olahan lama. `04_mintpy.py` kini membaca masker air dari `inputs/geometryGeo.h5` bila perlu.
+3. **Pembanding di luar cakupan citra** dicatat "tidak terukur" dan tidak ikut menentukan lulus. Titik ikat yang tidak terukur tetap membuat gerbang gagal.
+4. **Statistik perbukitan** hanya dihitung bila wilayah memakai koreksi troposfer perbukitan. Di Jakarta piksel di atas 80 m hanyalah dataran selatan.
+5. **Pekalongan: laju di stasiun CPKL lebih kecil dari GNSS.** Diuji tiga cara di lintasan ascending: jaringan lengkap -5,55 cm/tahun arah pandang, dengan koreksi galat unwrapping phase closure -5,55 (tidak berubah), hanya pasangan sampai 60 hari -4,20 (bias pasangan pendek). Jaringan lengkap tetap dipakai. GNSS CPKL 11,56 cm/tahun vertikal (2018-2021).
+6. **Internet putus** membuat `status_hyp3.py` gagal dan putaran unduh mengira antrean kosong. Skrip putaran sekarang menganggap status yang gagal dibaca sebagai masih berjalan.
+
+## Status Semarang
 
 Semua langkah sudah dijalankan penuh pada 14 November 2026.
 

@@ -170,11 +170,11 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
   const label = d.label.length > 42 ? `${d.label.slice(0, 41)}...` : d.label
   if (titik) {
     a.teks(label, M, y + 7, { ukuran: 19, tebal: true })
-    a.teks(`Kelurahan ${k.nama}, Kecamatan ${k.kecamatan}, Kota Semarang`, M, y + 12.5, { ukuran: 10.5, warna: ABU })
+    a.teks(`Kelurahan ${k.nama}, Kecamatan ${k.kecamatan}, ${meta.wilayah}`, M, y + 12.5, { ukuran: 10.5, warna: ABU })
     a.teks(`Titik ${fmtKoordinat(d.lngLat)}. Angka dari blok sekitar ${lebarBlok} m di sekitar titik.${periode ? `  ${periode}` : ''}`, M, y + 17, { ukuran: 8.3, warna: ABU })
   } else {
     a.teks(`Kelurahan ${k.nama}`, M, y + 7, { ukuran: 19, tebal: true })
-    a.teks(`Kecamatan ${k.kecamatan}, Kota Semarang`, M, y + 12.5, { ukuran: 10.5, warna: ABU })
+    a.teks(`Kecamatan ${k.kecamatan}, ${meta.wilayah}`, M, y + 12.5, { ukuran: 10.5, warna: ABU })
     a.teks(`Lokasi dipilih: ${label} (${fmtKoordinat(d.lngLat)})${periode ? `.  ${periode}` : ''}`, M, y + 17, { ukuran: 8.3, warna: ABU })
   }
   y += 22

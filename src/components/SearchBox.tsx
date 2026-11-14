@@ -2,7 +2,9 @@
 // alamat lewat Nominatim hanya saat menekan Enter / tombol Cari.
 import { useId, useMemo, useRef, useState } from 'react'
 import { CircleNotch, MagnifyingGlass, MapPin, X } from '@phosphor-icons/react'
+import { tempatWilayah } from '../lib/gazetteer'
 import { cariLokal, cariNominatim, normal, type HasilCari } from '../lib/geocode'
+import { wilayahById } from '../lib/wilayah'
 import { useApp } from '../lib/store'
 import { Button, cx } from '../ui/primitives'
 
@@ -10,6 +12,8 @@ type Status = 'diam' | 'memuat' | 'kosong' | 'galat'
 
 export default function SearchBox() {
   const kawasan = useApp((s) => s.kawasan)
+  const wilayah = useApp((s) => s.wilayah)
+  const infoWilayah = wilayahById(wilayah)!
   const pilihTitik = useApp((s) => s.pilihTitik)
   const pilihKawasan = useApp((s) => s.pilihKawasan)
   const [q, setQ] = useState('')
@@ -21,7 +25,7 @@ export default function SearchBox() {
   const input = useRef<HTMLInputElement>(null)
   const idDaftar = useId()
 
-  const lokal = useMemo(() => cariLokal(q, kawasan), [q, kawasan])
+  const lokal = useMemo(() => cariLokal(q, kawasan, 6, tempatWilayah(wilayah)), [q, kawasan, wilayah])
   const semua = [...lokal, ...daring]
   const tampil = buka && (semua.length > 0 || status !== 'diam')
 
@@ -43,7 +47,7 @@ export default function SearchBox() {
     setStatus('memuat')
     setBuka(true)
     try {
-      const r = await cariNominatim(teks, c.signal)
+      const r = await cariNominatim(teks, c.signal, infoWilayah.viewbox)
       if (c.signal.aborted) return
       setDaring(r)
       setStatus(r.length ? 'diam' : 'kosong')
@@ -120,7 +124,7 @@ export default function SearchBox() {
           aria-controls={idDaftar}
           aria-activedescendant={aktif >= 0 ? `${idDaftar}-${aktif}` : undefined}
           aria-autocomplete="list"
-          aria-label="Cari alamat, perumahan, atau kelurahan di Kota Semarang"
+          aria-label={`Cari alamat, perumahan, atau kelurahan di ${infoWilayah.nama}`}
           placeholder="Cari alamat, perumahan, atau kelurahan"
           autoComplete="off"
           enterKeyHint="search"
@@ -152,7 +156,7 @@ export default function SearchBox() {
             {semua.map(baris)}
           </ul>
           {status === 'memuat' && <p className="px-3 py-2 text-[12.5px] text-ink-3">Mencari alamat...</p>}
-          {status === 'kosong' && <p className="px-3 py-2 text-[12.5px] text-ink-2">Alamat tidak ditemukan di sekitar Kota Semarang. Coba nama kelurahan, atau klik langsung di peta.</p>}
+          {status === 'kosong' && <p className="px-3 py-2 text-[12.5px] text-ink-2">Alamat tidak ditemukan di sekitar {infoWilayah.nama}. Coba nama kelurahan, atau klik langsung di peta.</p>}
           {status === 'galat' && <p className="px-3 py-2 text-[12.5px] text-ink-2">Pencarian alamat sedang tidak bisa dihubungi. Nama kelurahan tetap bisa dicari, atau klik langsung di peta.</p>}
           <p className="px-3 pb-1 pt-1.5 text-[11.5px] text-ink-3">
             {daring.length > 0 ? 'Alamat dari Nominatim, data © OpenStreetMap.' : 'Tekan Cari untuk mencari alamat lewat Nominatim (OpenStreetMap).'}

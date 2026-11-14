@@ -2,7 +2,6 @@
 // File ditulis oleh pipeline/07_konteks.py. Kedua lapis memakai skema yang sama:
 // GeoJSON FeatureCollection, properti kode/nama/warna per fitur, dan metadata berisi
 // sumber, catatan, serta statistik laju penurunan per kelas.
-import { KONTEKS_URL } from './config'
 import { bboxOf, inBBox, pointInGeometry } from './geo'
 import type { BBox, KawasanGeometry, Position, SumberData } from './types'
 
@@ -147,9 +146,9 @@ export function statKelas(lapis: LapisKonteks | null | undefined, nama: string):
 export const KODE_ALUVIUM = 'Qa'
 
 /** Muat satu lapis. Gagal = null, aplikasi tetap jalan tanpa lapis itu. */
-export async function ambilKonteks(lapis: JenisLapis): Promise<LapisKonteks | null> {
+export async function ambilKonteks(lapis: JenisLapis, url: string): Promise<LapisKonteks | null> {
   try {
-    const res = await fetch(KONTEKS_URL[lapis])
+    const res = await fetch(url)
     if (!res.ok) return null
     return validasiKonteks(await res.json(), lapis)
   } catch {

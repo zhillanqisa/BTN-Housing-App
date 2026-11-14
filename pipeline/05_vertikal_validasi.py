@@ -34,13 +34,16 @@ import numpy as np
 from rasterio import features
 from rasterio.transform import from_origin
 
-from umum import AOI_KOTA, CSEM_LAJU_TURUN_CM, EPSG_UTM, KERJA, LINTASAN, PIKSEL_M, dir_lintasan
+from pyproj import Transformer
+
+from umum import AOI_KOTA, AREA_STABIL, EPSG_UTM, KERJA, LINTASAN, PEMBANDING, PIKSEL_M, REF_LAJU_TURUN_CM, REF_LALO, REF_NAMA, TINGGI_BUKIT_M, TROPOSFER, dir_lintasan
 
 # Gerbang mutu (cm/tahun).
 MAKS_RMSE_ANTAR_LINTASAN = 1.0
-MAKS_SELISIH_GNSS = 0.5
-# Sama dengan 04_mintpy.py: di atas tinggi ini dianggap perbukitan stabil.
-TINGGI_BUKIT_M = 80.0
+MAKS_SELISIH_GNSS = 0.5  # di stasiun titik ikat
+# Stasiun pembanding: periode GNSS (sampai 2021) tidak sama dengan periode InSAR (2020 dan seterusnya),
+# jadi batasnya lebih longgar.
+MAKS_SELISIH_PEMBANDING = 1.0
 
 
 def tahun_desimal(tanggal: str) -> float:
@@ -64,7 +67,11 @@ def baca_lintasan(nama: str) -> dict:
     with h5py.File(d / "velocity.h5", "r") as h:
         laju, galat = h["velocity"][:], h["velocityStd"][:]
         atr = {k: h.attrs[k] for k in ("X_FIRST", "Y_FIRST", "X_STEP", "Y_STEP", "EPSG", "REF_Y", "REF_X")}
-    with h5py.File(d / "timeseries_tropHgt_demErr.h5", "r") as h:
+    # deret terakhir: dengan koreksi troposfer bila ada, tanpa bila wilayahnya datar
+    akhir = d / "timeseries_tropHgt_demErr.h5"
+    if not akhir.exists():
+        akhir = d / "timeseries_demErr.h5"
+    with h5py.File(akhir, "r") as h:
         deret = h["timeseries"][:]
         tanggal = [t.decode() for t in h["date"][:]]
     with h5py.File(d / "inputs" / "ifgramStack.h5", "r") as h:
@@ -134,12 +141,29 @@ def persentil(nilai: np.ndarray, daftar: list[int]) -> dict[str, float]:
 
 def main() -> None:
     asc, desc = baca_lintasan("asc"), baca_lintasan("desc")
-    for k in ("X_FIRST", "Y_FIRST", "X_STEP", "Y_STEP", "REF_Y", "REF_X"):
+    for k in ("X_FIRST", "Y_FIRST", "X_STEP", "Y_STEP"):
         if str(asc["atr"][k]) != str(desc["atr"][k]):
-            raise SystemExit(f"Grid atau titik referensi dua lintasan berbeda pada {k}: {asc['atr'][k]} vs {desc['atr'][k]}")
+            raise SystemExit(f"Grid dua lintasan berbeda pada {k}: {asc['atr'][k]} vs {desc['atr'][k]}")
     ny, nx = asc["laju"].shape
     x0, y0 = float(asc["atr"]["X_FIRST"]), float(asc["atr"]["Y_FIRST"])
     ref_y, ref_x = int(asc["atr"]["REF_Y"]), int(asc["atr"]["REF_X"])
+    if (ref_y, ref_x) != (int(desc["atr"]["REF_Y"]), int(desc["atr"]["REF_X"])) and not AREA_STABIL:
+        # 04_mintpy.py bisa memindah acuan tiap lintasan ke piksel andal terdekat dari stasiun, dan pilihannya
+        # bisa berbeda. Kedua lintasan diikat ulang ke satu piksel yang andal di keduanya, terdekat ke stasiun.
+        sx, sy = Transformer.from_crs(4326, EPSG_UTM, always_xy=True).transform(REF_LALO[1], REF_LALO[0])
+        sc, sr = int((sx - x0) // PIKSEL_M), int((y0 - sy) // PIKSEL_M)
+        rr, cc = np.nonzero(asc["andal"] & desc["andal"])
+        if not len(rr):
+            raise SystemExit("Tidak ada piksel yang andal di dua lintasan untuk acuan bersama.")
+        skor = np.hypot(rr - sr, cc - sc) - 2 * (asc["koherensi"][rr, cc] + desc["koherensi"][rr, cc])
+        k = int(np.argmin(skor))
+        ref_y, ref_x = int(rr[k]), int(cc[k])
+        for dd in (asc, desc):
+            geser = float(dd["laju"][ref_y, ref_x])
+            dd["laju"] = dd["laju"] - geser
+            dd["deret"] = dd["deret"] - dd["deret"][:, ref_y, ref_x][:, None, None]
+            print(f"  {dd['nama']}: acuan bersama ({ref_y}, {ref_x}), laju digeser {100 * geser:+.2f} cm/tahun arah pandang")
+        print(f"Acuan bersama {PIKSEL_M * np.hypot(ref_y - sr, ref_x - sc):.0f} m dari stasiun {REF_NAMA}.")
 
     kota = gpd.read_file(AOI_KOTA).to_crs(EPSG_UTM)
     dalam = features.rasterize(((g, 1) for g in kota.geometry), out_shape=(ny, nx), transform=from_origin(x0, y0, PIKSEL_M, PIKSEL_M), fill=0, dtype="uint8").astype(bool)
@@ -161,6 +185,17 @@ def main() -> None:
     sumber = np.zeros((ny, nx), np.uint8)  # 0 tidak terukur, 1 dua lintasan, 2 hanya ascending, 3 hanya descending
     sumber[dua], sumber[hanya_a], sumber[hanya_d] = 1, 2, 3
 
+    # ---------- ikat ulang ke area stabil (wilayah tanpa stasiun GNSS stabil) ----------
+    stabil = None
+    if AREA_STABIL:
+        stabil = terukur & (asc["tinggi"] > AREA_STABIL["tinggi_min"])
+        if (stabil & ma).sum() < 200 or (stabil & md).sum() < 200:
+            raise SystemExit(f"Area stabil terlalu kecil: {int((stabil & ma).sum())} piksel asc, {int((stabil & md).sum())} piksel desc")
+        for dd, m in ((asc, stabil & ma), (desc, stabil & md)):
+            dd["laju"] = dd["laju"] - np.median(dd["laju"][m])
+            dd["deret"] = dd["deret"] - np.median(dd["deret"][:, m], axis=1)[:, None, None]
+        print(f"Diikat ulang ke {int(stabil.sum())} piksel area stabil ({AREA_STABIL['keterangan']}).")
+
     # Laju turun bila gerak dianggap vertikal seluruhnya, per lintasan (cm/tahun).
     turun_a = -100 * asc["laju"] / ta_a
     turun_d = -100 * desc["laju"] / ta_d
@@ -176,13 +211,41 @@ def main() -> None:
     rmse = float(np.sqrt(np.mean(selisih[s] ** 2)))
     antar = {"n": int(s.sum()), "rmse": round(rmse, 2), "bias": round(float(selisih[s].mean()), 2), "r": round(float(np.corrcoef(turun_a[s], turun_d[s])[0, 1]), 3)}
 
-    blok = np.zeros((ny, nx), bool)
-    blok[ref_y - 1 : ref_y + 2, ref_x - 1 : ref_x + 2] = True
-    blok[ref_y, ref_x] = False  # piksel referensi nol karena definisi, jadi tidak ikut
-    insar_csem = float(np.median(laju[blok & terukur])) if (blok & terukur).any() else float("nan")
-    lulus = rmse <= MAKS_RMSE_ANTAR_LINTASAN and abs(insar_csem - CSEM_LAJU_TURUN_CM) <= MAKS_SELISIH_GNSS
+    ke_utm = Transformer.from_crs(4326, EPSG_UTM, always_xy=True)
 
-    bukit = terukur & (asc["tinggi"] > TINGGI_BUKIT_M)
+    def laju_di(lat: float, lon: float, tanpa_tengah: bool = False) -> float | None:
+        """Median laju di blok 3 x 3 piksel sekitar satu titik."""
+        x, y = ke_utm.transform(lon, lat)
+        c, r = int((x - x0) // PIKSEL_M), int((y0 - y) // PIKSEL_M)
+        if not (1 <= r < ny - 1 and 1 <= c < nx - 1):
+            return None
+        blok = np.zeros((ny, nx), bool)
+        blok[r - 1 : r + 2, c - 1 : c + 2] = True
+        if tanpa_tengah:
+            blok[r, c] = False  # piksel referensi nol karena definisi
+        m = blok & terukur
+        return round(float(np.median(laju[m])), 2) if m.any() else None
+
+    gnss = []
+    if REF_LAJU_TURUN_CM is not None:
+        gnss.append({"stasiun": REF_NAMA, "peran": "titik ikat", "gnss": REF_LAJU_TURUN_CM, "insar": laju_di(*REF_LALO, tanpa_tengah=True)})
+    for nama_st, g in PEMBANDING.items():
+        gnss.append({"stasiun": nama_st, "peran": "pembanding", "gnss": g["laju_turun"], "insar": laju_di(*g["lalo"])})
+    # Pembanding yang tidak terukur (di luar cakupan citra atau tidak koheren) dicatat tetapi tidak ikut
+    # menentukan lulus; titik ikat yang tidak terukur tetap membuat gerbang gagal.
+    for s_ in gnss:
+        if s_["insar"] is None:
+            s_["catatan"] = "tidak terukur: di luar cakupan citra atau koherensi rendah"
+    cocok = [
+        (s_["insar"] is None and s_["peran"] == "pembanding")
+        or (s_["insar"] is not None and abs(s_["insar"] - s_["gnss"]) <= (MAKS_SELISIH_GNSS if s_["peran"] == "titik ikat" else MAKS_SELISIH_PEMBANDING))
+        for s_ in gnss
+    ]
+    lulus = rmse <= MAKS_RMSE_ANTAR_LINTASAN and all(cocok)
+
+    # statistik perbukitan hanya bermakna di wilayah yang memang punya perbukitan stabil (koreksi troposfer "bukit");
+    # di Jakarta piksel di atas ambang ini hanyalah dataran selatan, bukan perbukitan
+    bukit = terukur & (asc["tinggi"] > TINGGI_BUKIT_M) & (TROPOSFER == "bukit")
 
     # ---------- galat per piksel ----------
     formal = np.full((ny, nx), np.nan, np.float32)
@@ -243,12 +306,13 @@ def main() -> None:
             "hanyaDescending": int((hanya_d & dalam).sum()),
         },
         "antarLintasan": antar,
-        "gnss": [{"stasiun": "CSEM", "gnss": CSEM_LAJU_TURUN_CM, "insar": round(insar_csem, 2)}],
-        "bukit": {"n": int(bukit.sum()), "median": round(float(np.median(laju[bukit])), 2), **persentil(laju[bukit], [10, 90])},
+        "gnss": gnss,
+        "areaStabil": ({"n": int(stabil.sum()), "keterangan": AREA_STABIL["keterangan"]} if stabil is not None else None),
+        "bukit": ({"n": int(bukit.sum()), "median": round(float(np.median(laju[bukit])), 2), **persentil(laju[bukit], [10, 90])} if bukit.sum() >= 50 else None),
         "timurBarat": persentil(100 * timur[s], [5, 50, 95]),
         "lajuKota": {**persentil(laju[k], [1, 5, 25, 50, 75, 95, 99]), "maks": round(float(laju[k].max()), 2)},
         "sigmaKota": persentil(sigma[k], [50, 90, 99]),
-        "gerbang": {"maksRmseAntarLintasan": MAKS_RMSE_ANTAR_LINTASAN, "maksSelisihGnss": MAKS_SELISIH_GNSS, "lulus": bool(lulus)},
+        "gerbang": {"maksRmseAntarLintasan": MAKS_RMSE_ANTAR_LINTASAN, "maksSelisihGnss": MAKS_SELISIH_GNSS, "maksSelisihPembanding": MAKS_SELISIH_PEMBANDING, "lulus": bool(lulus)},
     }
     (hasil / "validasi.json").write_text(json.dumps(validasi, indent=2), encoding="utf-8")
     print(json.dumps(validasi, indent=2))

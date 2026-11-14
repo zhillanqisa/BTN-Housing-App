@@ -1,0 +1,16 @@
+{
+ "judul": "Peta Geologi Lembar Kudus dan Lembar Salatiga",
+ "sumber": [
+  {
+   "nama": "Suwarti dan Wikarno (1992), Peta Geologi Lembar Kudus, Jawa, skala 1:100.000, Pusat Penelitian dan Pengembangan Geologi",
+   "url": "https://geologi.esdm.go.id/geomap/",
+   "catatan": "Raster dari GeoMap Badan Geologi. Milik Pusat Survei Geologi, tidak diperjualbelikan."
+  },
+  {
+   "nama": "Sukardi dan Budhitrisna (1992), Peta Geologi Lembar Salatiga, Jawa, skala 1:100.000, Pusat Penelitian dan Pengembangan Geologi",
+   "url": "https://geologi.esdm.go.id/geomap/",
+   "catatan": "Raster dari GeoMap Badan Geologi. Milik Pusat Survei Geologi, tidak diperjualbelikan."
+  }
+ ],
+ "aturan": "Digitasi semi-otomatis: georeferensi dari empat sudut bingkai, warna tiap satuan diambil dari kotak legenda lembar, piksel diberi satuan dengan warna terdekat, lalu huruf, garis, dan simbol dibuang dan celahnya diisi satuan terdekat. Ketelitian batas sekitar 100 sampai 200 m. Sekitar 25 km² wilayah berada di luar lembar dan diisi satuan dari tepi lembar terdekat."
+}
