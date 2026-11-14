@@ -1,21 +1,45 @@
-// Visual Proyeksi Tenor: potongan samping berskala tetap (100 cm = 26 px).
-// Garis putus = posisi rumah dan tanah sekarang. Rumah terisi = posisi jika tren bertahan.
-// Pita violet = rentang ketidakpastian muka tanah baru.
+// Visual Proyeksi Tenor: potongan samping. Garis putus = rumah dan tanah sekarang.
+// Rumah terisi = posisi jika tren bertahan. Pita violet = rentang ketidakpastian muka tanah baru.
+//
+// Skala ditentukan dari proyeksi tenor TERPANJANG di lokasi ini, bukan tenor yang dipilih, supaya
+// mengganti tenor menggeser rumah pada skala yang sama. Bila penurunan cukup besar, gambar berskala
+// nyata (100 cm = 26 px, pintu 2 m). Bila terlalu kecil untuk terlihat, sumbu tegak diperbesar dan
+// rumah menjadi ikon tidak berskala; keterangan dan mistar menyebutkannya.
+import { TENORS } from '../lib/config'
 import { fmt } from '../lib/format'
 import { hitungProyeksi, kalimatProyeksi, teksProyeksi } from '../lib/risk'
 import type { Tenor } from '../lib/types'
 
-const S = 0.26 // px per cm
+const S_NYATA = 0.26 // px per cm pada skala nyata
 const Y0 = 122 // muka tanah sekarang
-const MAKS_CM = 300 // batas gambar
-const GESER = 'transform 700ms cubic-bezier(0.16, 1, 0.3, 1)'
+const DALAM_PX = 78 // tinggi area di bawah muka tanah sampai batas gambar
+const MIN_NYATA_PX = 26 // proyeksi terpanjang di bawah ini (100 cm) terlalu kecil untuk skala nyata
+const FAKTOR = [2, 5, 10, 20, 50, 100] // pembesaran bertingkat supaya mudah dibaca dan dibandingkan
+const EASE = '700ms cubic-bezier(0.16, 1, 0.3, 1)'
 
-/** Rumah satu lantai berskala: dinding 3 m, atap 1,4 m, pintu 0,9 x 2 m, lebar 6 m. */
+/** Langkah mistar yang rapi (1, 2, 5 x 10^n) untuk rentang tertentu. */
+function langkahRapi(rentang: number): number {
+  const kasar = rentang / 3
+  const pangkat = 10 ** Math.floor(Math.log10(kasar))
+  const n = kasar / pangkat
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pangkat
+}
+
+/** Skala px per cm untuk satu lokasi. Diperbesar bertingkat bila proyeksi terpanjang di bawah 1 m,
+ *  dengan faktor terbesar yang masih memuat proyeksi terpanjang di dalam gambar. */
+export function skalaTenor(laju: number, sigma: number): { s: number; perbesar: number } {
+  const terpanjang = hitungProyeksi(laju, sigma, Math.max(...TENORS) as Tenor).atas * S_NYATA
+  if (terpanjang >= MIN_NYATA_PX) return { s: S_NYATA, perbesar: 1 }
+  const f = [...FAKTOR].reverse().find((x) => terpanjang * x <= DALAM_PX) ?? FAKTOR[0]!
+  return { s: S_NYATA * f, perbesar: f }
+}
+
+/** Rumah satu lantai. Pada skala nyata: dinding 3 m, atap 1,4 m, pintu 0,9 x 2 m, lebar 6 m. */
 function Rumah({ hantu }: { hantu?: boolean }) {
   const x = 126 // di kanan label "Muka tanah sekarang"
-  const lebar = 600 * S
-  const dinding = 300 * S
-  const atap = 140 * S
+  const lebar = 600 * S_NYATA
+  const dinding = 300 * S_NYATA
+  const atap = 140 * S_NYATA
   const gaya = hantu
     ? { fill: 'none', stroke: 'var(--ink-3)', strokeWidth: 1, strokeDasharray: '3 3' }
     : { fill: 'var(--surface)', stroke: 'var(--ink)', strokeWidth: 1.5 }
@@ -25,8 +49,8 @@ function Rumah({ hantu }: { hantu?: boolean }) {
       <rect x={x} y={Y0 - dinding} width={lebar} height={dinding} {...gaya} />
       {!hantu && (
         <>
-          <rect x={x + 26} y={Y0 - 200 * S} width={90 * S} height={200 * S} fill="var(--surface-2)" stroke="var(--ink)" strokeWidth={1.2} />
-          <rect x={x + 82} y={Y0 - 220 * S} width={46} height={30} fill="var(--surface-2)" stroke="var(--ink)" strokeWidth={1.2} />
+          <rect x={x + 26} y={Y0 - 200 * S_NYATA} width={90 * S_NYATA} height={200 * S_NYATA} fill="var(--surface-2)" stroke="var(--ink)" strokeWidth={1.2} />
+          <rect x={x + 82} y={Y0 - 220 * S_NYATA} width={46} height={30} fill="var(--surface-2)" stroke="var(--ink)" strokeWidth={1.2} />
         </>
       )}
     </g>
@@ -35,11 +59,18 @@ function Rumah({ hantu }: { hantu?: boolean }) {
 
 export default function TenorVisual({ laju, sigma, tenor }: { laju: number; sigma: number; tenor: Tenor }) {
   const p = hitungProyeksi(laju, sigma, tenor)
-  const px = (cm: number) => Math.min(MAKS_CM, cm) * S
-  const yBawah = Y0 + px(p.bawah)
-  const yAtas = Y0 + px(p.atas)
-  const yTengah = Y0 + px(p.tengah)
-  const melebihi = p.atas > MAKS_CM
+  const { s, perbesar } = skalaTenor(laju, sigma)
+  const maksCm = DALAM_PX / s
+  const px = (cm: number) => Math.min(maksCm, Math.max(0, cm)) * s
+  const geserTengah = px(p.tengah)
+  const atasBand = px(p.bawah)
+  const tinggiBand = Math.max(2, px(p.atas) - px(p.bawah))
+  const melebihi = p.atas > maksCm
+  const langkah = langkahRapi(maksCm)
+  const tanda: number[] = []
+  for (let v = 0; v <= maksCm + 1e-9; v += langkah) tanda.push(Math.round(v * 1000) / 1000)
+  // Semua gerak memakai CSS transform: transisinya berjalan di semua peramban, tidak seperti atribut y/height SVG
+  const gerak = (y: number) => ({ transform: `translateY(${y}px)`, transition: `transform ${EASE}` })
 
   return (
     <div>
@@ -54,7 +85,7 @@ export default function TenorVisual({ laju, sigma, tenor }: { laju: number; sigm
 
       <svg viewBox="0 0 360 214" className="mt-3 block w-full" role="img" aria-label={kalimatProyeksi(p)}>
         {/* tanah di bawah muka tanah baru */}
-        <rect x={0} y={yTengah} width={300} height={214 - yTengah} fill="var(--surface-2)" style={{ transition: 'y 700ms cubic-bezier(0.16,1,0.3,1), height 700ms cubic-bezier(0.16,1,0.3,1)' }} />
+        <rect x={0} y={Y0} width={300} height={214 - Y0} fill="var(--surface-2)" style={gerak(geserTengah)} />
 
         {/* posisi sekarang */}
         <Rumah hantu />
@@ -63,17 +94,17 @@ export default function TenorVisual({ laju, sigma, tenor }: { laju: number; sigm
           Muka tanah sekarang
         </text>
 
-        {/* rentang muka tanah baru */}
+        {/* rentang muka tanah baru: persegi 1 px yang digeser lalu ditarik setinggi rentangnya */}
         <rect
           x={0}
-          y={yBawah}
+          y={Y0}
           width={300}
-          height={Math.max(2, yAtas - yBawah)}
+          height={1}
           fill="var(--data)"
           opacity={0.22}
-          style={{ transition: 'y 700ms cubic-bezier(0.16,1,0.3,1), height 700ms cubic-bezier(0.16,1,0.3,1)' }}
+          style={{ transform: `translateY(${atasBand}px) scaleY(${tinggiBand})`, transformBox: 'fill-box', transformOrigin: 'top', transition: `transform ${EASE}` }}
         />
-        <g style={{ transform: `translateY(${px(p.tengah)}px)`, transition: GESER }}>
+        <g data-geser={geserTengah.toFixed(1)} style={gerak(geserTengah)}>
           <line x1={0} x2={300} y1={Y0} y2={Y0} stroke="var(--data)" strokeWidth={2} />
           <Rumah />
         </g>
@@ -81,13 +112,13 @@ export default function TenorVisual({ laju, sigma, tenor }: { laju: number; sigm
           Jika tren bertahan, setelah {tenor} tahun
         </text>
 
-        {/* mistar kedalaman */}
-        <line x1={318} x2={318} y1={Y0} y2={Y0 + MAKS_CM * S} stroke="var(--line-2)" strokeWidth={1} />
-        {[0, 100, 200, 300].map((cm) => (
+        {/* mistar kedalaman, mengikuti skala */}
+        <line x1={318} x2={318} y1={Y0} y2={Y0 + DALAM_PX} stroke="var(--line-2)" strokeWidth={1} />
+        {tanda.map((cm) => (
           <g key={cm}>
-            <line x1={314} x2={322} y1={Y0 + cm * S} y2={Y0 + cm * S} stroke="var(--ink-3)" strokeWidth={1} />
-            <text x={326} y={Y0 + cm * S + 3.5} fontSize={10} fill="var(--ink-3)" className="tnum">
-              {cm}
+            <line x1={314} x2={322} y1={Y0 + cm * s} y2={Y0 + cm * s} stroke="var(--ink-3)" strokeWidth={1} />
+            <text x={326} y={Y0 + cm * s + 3.5} fontSize={10} fill="var(--ink-3)" className="tnum">
+              {fmt(cm, cm > 0 && cm < 1 ? 1 : 0)}
             </text>
           </g>
         ))}
@@ -98,8 +129,10 @@ export default function TenorVisual({ laju, sigma, tenor }: { laju: number; sigm
 
       <p className="mt-2 text-[13.5px] leading-snug text-ink">{kalimatProyeksi(p)}</p>
       <p className="mt-1.5 text-[12px] leading-snug text-ink-3">
-        Gambar berskala, pintu setinggi 2 m. Seluruh kawasan turun bersama, termasuk jalan dan rumah.
-        {melebihi ? ' Proyeksi melebihi batas gambar (300 cm).' : ''}
+        {perbesar > 1
+          ? `Penurunan di sini kecil, jadi sumbu tegak diperbesar ${fmt(perbesar)} kali supaya terlihat. Rumah hanya ikon, tidak berskala. Baca angkanya pada mistar di kanan.`
+          : 'Gambar berskala, pintu setinggi 2 m. Seluruh kawasan turun bersama, termasuk jalan dan rumah.'}
+        {melebihi ? ` Proyeksi melebihi batas gambar (${fmt(maksCm)} cm).` : ''}
       </p>
     </div>
   )

@@ -6,10 +6,23 @@ import { fmt } from '../lib/format'
 
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
-function labelWaktu(t: number): string {
+/** Tahun desimal -> "Feb 2020". Dibulatkan ke bawah: 2020,125 (pertengahan Februari) adalah Februari. */
+export function labelWaktu(t: number): string {
   const tahun = Math.floor(t + 1e-6)
-  const bulan = Math.min(11, Math.round((t - tahun) * 12))
+  const bulan = Math.min(11, Math.max(0, Math.floor((t - tahun) * 12 + 1e-6)))
   return `${BULAN[bulan]} ${tahun}`
+}
+
+/** Satu baris per tahun (epoch pertama tiap tahun) ditambah titik terakhir. Epoch tidak harus jatuh di awal tahun. */
+export function barisTahunan(deret: [number, number][]): [number, number][] {
+  const hasil: [number, number][] = []
+  let tahunLalu = Number.NEGATIVE_INFINITY
+  deret.forEach((d, i) => {
+    const tahun = Math.floor(d[0] + 1e-6)
+    if (tahun !== tahunLalu || i === deret.length - 1) hasil.push(d)
+    tahunLalu = tahun
+  })
+  return hasil
 }
 
 function langkahRapi(rentang: number): number {
@@ -25,6 +38,8 @@ export default function HistoryChart({ deret }: { deret: [number, number][] }) {
   const [aktif, setAktif] = useState<number | null>(null)
 
   const g = useMemo(() => {
+    // data unggahan tanpa deret: jangan hitung apa pun (hook tetap dipanggil, hasilnya null)
+    if (deret.length < 2) return null
     const t0 = deret[0]![0]
     const t1 = deret[deret.length - 1]![0]
     const vMin = Math.min(...deret.map((d) => d[1]))
@@ -44,7 +59,7 @@ export default function HistoryChart({ deret }: { deret: [number, number][] }) {
     return { x, y, titik, garis, luas, tikY, tikX }
   }, [deret])
 
-  if (deret.length < 2) return <p className="text-[13px] text-ink-3">Deret waktu tidak tersedia.</p>
+  if (!g) return <p className="text-[13px] text-ink-3">Deret waktu tidak tersedia di data ini.</p>
 
   const akhir = deret[deret.length - 1]!
   const tAkhir = g.titik[g.titik.length - 1]!
@@ -66,7 +81,7 @@ export default function HistoryChart({ deret }: { deret: [number, number][] }) {
     setAktif(terdekat)
   }
 
-  const tahunan = deret.filter((d, i) => Math.abs(d[0] - Math.round(d[0])) < 1e-6 || i === deret.length - 1)
+  const tahunan = barisTahunan(deret)
 
   return (
     <div>

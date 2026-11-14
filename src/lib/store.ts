@@ -123,6 +123,13 @@ export const useApp = create<AppState>()((set, get) => ({
     indeks = new Map(kawasan.map((k) => [k.id, k]))
     const sel = get().selection
     const k = sel ? cariKawasanDiTitik(sel.lngLat, kawasan) : null
+    // Label buatan aplikasi mengikuti jenis data: per titik bila ada grid, per kelurahan bila tidak.
+    // Label dari pengguna atau pencarian (mis. "Tanah Mas") dibiarkan.
+    let label = sel?.label ?? ''
+    if (sel && (label === LABEL_TITIK || label.startsWith('Kelurahan ') || label.startsWith('Pusat Kelurahan '))) {
+      const diPusat = !!k && kunciTitik(k.pusat) === kunciTitik(sel.lngLat)
+      label = grid ? (k && diPusat ? `Pusat Kelurahan ${k.nama}` : LABEL_TITIK) : k ? `Kelurahan ${k.nama}` : LABEL_TITIK
+    }
     set((s) => ({
       status: 'siap',
       galat: null,
@@ -132,7 +139,7 @@ export const useApp = create<AppState>()((set, get) => ({
       versiData: s.versiData + 1,
       versiGrid: s.versiGrid + 1,
       banding: s.banding.filter((t) => cariKawasanDiTitik(t.lngLat, kawasan)),
-      selection: sel ? { ...sel, kawasanId: k?.id ?? null } : null,
+      selection: sel ? { ...sel, kawasanId: k?.id ?? null, label } : null,
     }))
   },
 
