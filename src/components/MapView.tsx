@@ -3,16 +3,17 @@
 // disorot sebagai blok piksel. Tanpa grid (mis. data unggahan): koroplet per kelurahan.
 import { useEffect, useRef, useState } from 'react'
 import { Map as PetaGL, Marker, Popup, setWorkerUrl, type GeoJSONSource, type ImageSource, type MapLayerMouseEvent, type PaddingOptions } from 'maplibre-gl'
-import type { ExpressionSpecification, StyleSpecification } from '@maplibre/maplibre-gl-style-spec'
+import type { ExpressionSpecification, GeoJSONSourceSpecification, StyleSpecification } from '@maplibre/maplibre-gl-style-spec'
 // MapLibre v6 memuat worker dari file terpisah; Vite membundelnya lewat ?worker&url.
 import urlPekerja from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { LABEL_KATEGORI, LAJU_BINS, MAP, RAMP, WARNA_KATEGORI } from '../lib/config'
 import { geojsonPeta } from '../lib/data'
 import { fmt } from '../lib/format'
-import { mergeBBox } from '../lib/geo'
+import { mergeBBox, polygonsOf } from '../lib/geo'
 import { batasBlok, lukisGrid, nilaiDi, type Grid, type RGBA } from '../lib/grid'
+import { JENIS_LAPIS, konteksDi, LABEL_LAPIS, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { binLaju, klasifikasi } from '../lib/risk'
-import { jembatanPeta, useApp } from '../lib/store'
+import { jembatanPeta, kawasanById, useApp } from '../lib/store'
 import type { BBox, Kawasan, ModePeta, Position, Tema, Thresholds } from '../lib/types'
 import { Notice } from '../ui/primitives'
 
@@ -31,9 +32,44 @@ const L_GRID = 'pa-grid-piksel'
 const SRC_BLOK = 'pa-blok'
 const L_BLOK_LUAR = 'pa-blok-luar'
 const L_BLOK = 'pa-blok-garis'
+// Sorotan kelurahan yang memuat titik terpilih: area di luarnya diredupkan, batasnya diberi cahaya.
+const SRC_REDUP = 'pa-redup'
+const L_REDUP = 'pa-redup-isi'
+const L_PILIH_HALO = 'pa-pilih-halo'
+const AKSEN = '#c6f135'
+const srcKonteks = (j: JenisLapis) => `pa-konteks-${j}`
+const lIsiKonteks = (j: JenisLapis) => `pa-konteks-${j}-isi`
+const lGarisKonteks = (j: JenisLapis) => `pa-konteks-${j}-garis`
+const OPASITAS_GRID = { biasa: { light: 0.76, dark: 0.82 }, konteks: { light: 0.3, dark: 0.34 } }
 
 const ekspr = (e: unknown) => e as ExpressionSpecification
 const KOSONG = { type: 'FeatureCollection' as const, features: [] }
+
+// Kotak jauh lebih luas dari batas gerak peta: lubangnya adalah kelurahan terpilih.
+const DUNIA: Position[] = [
+  [109.4, -8],
+  [111.5, -8],
+  [111.5, -6.1],
+  [109.4, -6.1],
+  [109.4, -8],
+]
+const luasBertanda = (r: Position[]) => r.reduce((a, p, i) => (i ? a + (r[i - 1]![0] * p[1] - p[0] * r[i - 1]![1]) : a), 0) / 2
+/** MapLibre mengenali lubang dari arah putaran yang berlawanan dengan cincin luar. */
+const searah = (r: Position[], berlawananJarum: boolean) => ((luasBertanda(r) > 0) === berlawananJarum ? r : [...r].reverse())
+
+function topengLuar(k: Kawasan) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: [
+      {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'Polygon' as const, coordinates: [searah(DUNIA, true), ...polygonsOf(k.geometry).map((p) => searah(p[0]!, false))] },
+      },
+    ],
+  }
+}
+
 
 function warnaIsi(mode: ModePeta, tema: Tema, t: Thresholds): ExpressionSpecification {
   const w = WARNA_KATEGORI[tema]
@@ -136,6 +172,51 @@ interface Ringkas {
   modePeta: ModePeta
   thresholds: Thresholds
   tigaD: boolean
+  konteks: Partial<Record<JenisLapis, LapisKonteks>>
+  lapisKonteks: JenisLapis | null
+}
+
+const opasitasGrid = (s: Ringkas) => OPASITAS_GRID[s.lapisKonteks ? 'konteks' : 'biasa'][s.tema]
+
+/** Lapis konteks (pola ruang, geologi): pasang yang sudah termuat, tampilkan hanya yang dipilih. */
+function terapkanKonteks(map: PetaGL, s: Ringkas): void {
+  if (!map.getLayer(L_ISI)) return
+  const gelap = s.tema === 'dark'
+  for (const j of JENIS_LAPIS) {
+    const l = s.konteks[j]
+    if (!l) continue
+    const src = srcKonteks(j)
+    if (!map.getSource(src)) map.addSource(src, { type: 'geojson', data: l.geojson as GeoJSONSourceSpecification['data'] })
+    // di bawah lapis redup, supaya sorotan kelurahan tetap bekerja
+    const sebelum = map.getLayer(L_REDUP) ? L_REDUP : undefined
+    if (!map.getLayer(lIsiKonteks(j))) {
+      map.addLayer({ id: lIsiKonteks(j), type: 'fill', source: src, paint: { 'fill-color': ekspr(['get', 'warna']), 'fill-opacity': gelap ? 0.5 : 0.56 } }, sebelum)
+    }
+    if (!map.getLayer(lGarisKonteks(j))) {
+      map.addLayer(
+        {
+          id: lGarisKonteks(j),
+          type: 'line',
+          source: src,
+          layout: { 'line-join': 'round' },
+          paint: { 'line-color': gelap ? 'rgba(255,255,255,0.55)' : 'rgba(22,22,29,0.45)', 'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 1.6]) },
+        },
+        sebelum,
+      )
+    }
+    const tampil = s.lapisKonteks === j ? 'visible' : 'none'
+    map.setLayoutProperty(lIsiKonteks(j), 'visibility', tampil)
+    map.setLayoutProperty(lGarisKonteks(j), 'visibility', tampil)
+  }
+  if (map.getLayer(L_GRID)) map.setPaintProperty(L_GRID, 'raster-opacity', opasitasGrid(s))
+  // saat lapis konteks tampil, redupan di luar kelurahan dibuat tipis supaya warna kelasnya tetap terbaca
+  if (map.getLayer(L_REDUP)) map.setPaintProperty(L_REDUP, 'fill-opacity', opasitasRedup(s))
+}
+
+function opasitasRedup(s: Ringkas): number {
+  const gelap = s.tema === 'dark'
+  if (s.lapisKonteks) return gelap ? 0.18 : 0.1
+  return gelap ? 0.42 : 0.26
 }
 
 /** Pasang sumber dan layer kita di atas gaya peta dasar. Aman dipanggil berulang. */
@@ -154,9 +235,10 @@ function pasang(map: PetaGL, s: Ringkas): void {
     map.addSource(SRC_GRID, { type: 'image', url: gambarGrid(s.grid, s.modePeta, s.tema, s.thresholds), coordinates: sudutGrid(s.grid) })
   }
   if (s.grid && !map.getLayer(L_GRID)) {
+    // grid bisa tiba setelah lapis lain terpasang: selalu sisipkan di bawah lapis kita (konteks, redup)
     map.addLayer(
-      { id: L_GRID, type: 'raster', source: SRC_GRID, paint: { 'raster-resampling': 'nearest', 'raster-opacity': gelap ? 0.82 : 0.76, 'raster-fade-duration': 0 } },
-      bawah,
+      { id: L_GRID, type: 'raster', source: SRC_GRID, paint: { 'raster-resampling': 'nearest', 'raster-opacity': opasitasGrid(s), 'raster-fade-duration': 0 } },
+      map.getLayer(L_ISI) ? L_ISI : bawah,
     )
   }
 
@@ -186,20 +268,14 @@ function pasang(map: PetaGL, s: Ringkas): void {
       simbolPertama,
     )
   }
+  // lapis redup: di atas piksel dan lapis konteks, di bawah jalan dan label peta dasar
+  if (!map.getSource(SRC_REDUP)) map.addSource(SRC_REDUP, { type: 'geojson', data: KOSONG })
+  if (!map.getLayer(L_REDUP)) {
+    map.addLayer({ id: L_REDUP, type: 'fill', source: SRC_REDUP, paint: { 'fill-color': gelap ? '#000000' : '#16161d', 'fill-opacity': opasitasRedup(s) } }, bawah)
+  }
+  terapkanKonteks(map, s)
   const tanpaPilihan = ['==', ['get', 'id'], '__tidak_ada__'] as ['==', ['get', string], string]
   const luar = gelap ? '#0d0d12' : '#16161d'
-  if (!map.getLayer(L_PILIH_LUAR)) {
-    map.addLayer(
-      { id: L_PILIH_LUAR, type: 'line', source: SRC, filter: tanpaPilihan, layout: { 'line-join': 'round' }, paint: { 'line-color': luar, 'line-width': 6.5 } },
-      simbolPertama,
-    )
-  }
-  if (!map.getLayer(L_PILIH)) {
-    map.addLayer(
-      { id: L_PILIH, type: 'line', source: SRC, filter: tanpaPilihan, layout: { 'line-join': 'round' }, paint: { 'line-color': '#c6f135', 'line-width': 3 } },
-      simbolPertama,
-    )
-  }
   // Bangunan 3D dari tile vektor peta dasar (OpenMapTiles: layer "building", atribut render_height).
   if (map.getSource('openmaptiles') && !map.getLayer(L_BANGUNAN)) {
     map.addLayer(
@@ -222,6 +298,32 @@ function pasang(map: PetaGL, s: Ringkas): void {
     )
   }
   if (map.getLayer('building')) map.setLayoutProperty('building', 'visibility', s.tigaD && map.getLayer(L_BANGUNAN) ? 'none' : 'visible')
+  // Batas kelurahan terpilih: cahaya lebar, garis gelap, lalu garis aksen. Setelah bangunan 3D supaya tidak tertutup.
+  if (!map.getLayer(L_PILIH_HALO)) {
+    map.addLayer(
+      {
+        id: L_PILIH_HALO,
+        type: 'line',
+        source: SRC,
+        filter: tanpaPilihan,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': AKSEN, 'line-width': 16, 'line-blur': 12, 'line-opacity': gelap ? 0.55 : 0.7 },
+      },
+      simbolPertama,
+    )
+  }
+  if (!map.getLayer(L_PILIH_LUAR)) {
+    map.addLayer(
+      { id: L_PILIH_LUAR, type: 'line', source: SRC, filter: tanpaPilihan, layout: { 'line-join': 'round' }, paint: { 'line-color': luar, 'line-width': 5.5 } },
+      simbolPertama,
+    )
+  }
+  if (!map.getLayer(L_PILIH)) {
+    map.addLayer(
+      { id: L_PILIH, type: 'line', source: SRC, filter: tanpaPilihan, layout: { 'line-join': 'round' }, paint: { 'line-color': AKSEN, 'line-width': 2.6 } },
+      simbolPertama,
+    )
+  }
   // Blok piksel di sekitar titik terpilih (hanya terisi bila ada grid). Dipasang setelah
   // bangunan 3D supaya garisnya tidak tertutup: blok 240 m lebih kecil dari satu blok kota.
   if (!map.getSource(SRC_BLOK)) map.addSource(SRC_BLOK, { type: 'geojson', data: KOSONG })
@@ -229,7 +331,7 @@ function pasang(map: PetaGL, s: Ringkas): void {
     map.addLayer({ id: L_BLOK_LUAR, type: 'line', source: SRC_BLOK, layout: { 'line-join': 'round' }, paint: { 'line-color': luar, 'line-width': 6 } }, simbolPertama)
   }
   if (!map.getLayer(L_BLOK)) {
-    map.addLayer({ id: L_BLOK, type: 'line', source: SRC_BLOK, layout: { 'line-join': 'round' }, paint: { 'line-color': '#c6f135', 'line-width': 2.8 } }, simbolPertama)
+    map.addLayer({ id: L_BLOK, type: 'line', source: SRC_BLOK, layout: { 'line-join': 'round' }, paint: { 'line-color': AKSEN, 'line-width': 2.8 } }, simbolPertama)
   }
 }
 
@@ -251,6 +353,7 @@ export default function MapView({ aktif }: { aktif: boolean }) {
   const wadah = useRef<HTMLDivElement>(null)
   const peta = useRef<PetaGL | null>(null)
   const penanda = useRef<Marker | null>(null)
+  const labelKel = useRef<Marker | null>(null)
   const temaTerpasang = useRef<Tema>(useApp.getState().tema)
   const modeCadangan = useRef(false)
   const sudahPas = useRef(false)
@@ -266,6 +369,8 @@ export default function MapView({ aktif }: { aktif: boolean }) {
   const thresholds = useApp((s) => s.thresholds)
   const tigaD = useApp((s) => s.tigaD)
   const selection = useApp((s) => s.selection)
+  const konteks = useApp((s) => s.konteks)
+  const lapisKonteks = useApp((s) => s.lapisKonteks)
 
   // ---------- inisialisasi (sekali) ----------
   useEffect(() => {
@@ -331,7 +436,9 @@ export default function MapView({ aktif }: { aktif: boolean }) {
         idSorot = p.id
         map.setFeatureState({ source: SRC, id: idSorot }, { hover: true })
       }
-      const kunci = `${p.id}|${piksel ? (piksel.status === 'luar' ? 'luar' : piksel.indeks) : ''}`
+      const lapis = st.lapisKonteks
+      const kelas = lapis ? konteksDi(st.konteks[lapis], [e.lngLat.lng, e.lngLat.lat]) : null
+      const kunci = `${p.id}|${piksel ? (piksel.status === 'luar' ? 'luar' : piksel.indeks) : ''}|${lapis ?? ''}|${kelas?.nama ?? ''}`
       if (kunci !== kunciSorot) {
         kunciSorot = kunci
         let nilai: string
@@ -356,6 +463,16 @@ export default function MapView({ aktif }: { aktif: boolean }) {
         c.style.marginTop = '4px'
         c.textContent = nilai
         el.append(a, b, c)
+        if (lapis && kelas) {
+          const d = document.createElement('div')
+          d.style.cssText = 'margin-top:4px;display:flex;align-items:center;gap:6px'
+          const kotak = document.createElement('span')
+          kotak.style.cssText = `width:10px;height:10px;border-radius:3px;flex-shrink:0;background:${kelas.warna}`
+          const t = document.createElement('span')
+          t.textContent = `${LABEL_LAPIS[lapis]}: ${kelas.nama}`
+          d.append(kotak, t)
+          el.append(d)
+        }
         popup.setDOMContent(el)
       }
       popup.setLngLat(e.lngLat).addTo(map)
@@ -403,6 +520,8 @@ export default function MapView({ aktif }: { aktif: boolean }) {
       jembatanPeta.ambilGambar = null
       penanda.current?.remove()
       penanda.current = null
+      labelKel.current?.remove()
+      labelKel.current = null
       popup.remove()
       map.remove()
       peta.current = null
@@ -450,16 +569,41 @@ export default function MapView({ aktif }: { aktif: boolean }) {
     map.easeTo({ pitch: tigaD ? MAP.pitch : 0, duration: 600 })
   }, [tigaD, gayaKe])
 
-  // ---------- lokasi terpilih: garis sorot, penanda, kamera ----------
+  // ---------- lapis konteks ----------
+  useEffect(() => {
+    const map = peta.current
+    if (map) terapkanKonteks(map, useApp.getState())
+  }, [konteks, lapisKonteks, tema, gayaKe])
+
+  // ---------- lokasi terpilih: sorotan kelurahan, blok piksel, penanda, kamera ----------
   useEffect(() => {
     const map = peta.current
     if (!map || !map.getLayer(L_PILIH)) return
-    // dengan grid yang disorot adalah blok piksel; tanpa grid, batas kelurahan
-    const filter = ['==', ['get', 'id'], (!grid && selection?.kawasanId) || '__tidak_ada__'] as ['==', ['get', string], string]
-    map.setFilter(L_PILIH, filter)
-    map.setFilter(L_PILIH_LUAR, filter)
-    const kotak = grid && selection?.kawasanId ? batasBlok(grid, selection.lngLat) : null
+    // kelurahan yang memuat titik selalu disorot; dengan grid, blok piksel ikut disorot di dalamnya
+    const kel = kawasanById(selection?.kawasanId)
+    const filter = ['==', ['get', 'id'], kel?.id ?? '__tidak_ada__'] as ['==', ['get', string], string]
+    for (const l of [L_PILIH_HALO, L_PILIH_LUAR, L_PILIH]) if (map.getLayer(l)) map.setFilter(l, filter)
+    ;(map.getSource(SRC_REDUP) as GeoJSONSource | undefined)?.setData(kel ? topengLuar(kel) : KOSONG)
+    const kotak = grid && kel && selection ? batasBlok(grid, selection.lngLat) : null
     ;(map.getSource(SRC_BLOK) as GeoJSONSource | undefined)?.setData(kotak ? poligonKotak(kotak) : KOSONG)
+
+    labelKel.current?.remove()
+    labelKel.current = null
+    if (kel) {
+      // nama dari data: lewat textContent. Animasi ada di elemen dalam, karena MapLibre
+      // memosisikan elemen luar lewat transform.
+      const el = document.createElement('div')
+      const isi = document.createElement('div')
+      isi.className = 'pa-label-kel'
+      const kecil = document.createElement('small')
+      kecil.textContent = 'Kel.'
+      const nama = document.createElement('b')
+      nama.textContent = kel.nama
+      isi.append(kecil, nama)
+      el.append(isi)
+      // di atas titik terpilih (bukan di tepi batas): selalu terlihat, juga saat peta miring 3D
+      labelKel.current = new Marker({ element: el, anchor: 'bottom', offset: [0, -30] }).setLngLat(selection!.lngLat).addTo(map)
+    }
 
     if (!selection) {
       penanda.current?.remove()

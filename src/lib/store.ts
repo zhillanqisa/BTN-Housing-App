@@ -5,6 +5,7 @@ import { create } from 'zustand'
 import { DEFAULT_TENOR, DEFAULT_THRESHOLDS, GRID_URL, MAKS_BANDING, THRESHOLD_LIMITS } from './config'
 import { ambilDatasetDemo, cariKawasanDiTitik, indeksKawasan } from './data'
 import { ambilDeret, ambilGrid, type Grid } from './grid'
+import { ambilKonteks, JENIS_LAPIS, type JenisLapis, type LapisKonteks } from './konteks'
 import { bacaLokasi, kunciTitik, LABEL_TITIK, type Bacaan } from './lokasi'
 import type { AsalPilihan, Dataset, DatasetMeta, Kawasan, ModePeta, Position, Selection, Tema, Tenor, Thresholds, TitikBanding } from './types'
 
@@ -51,6 +52,10 @@ export interface AppState {
   tema: Tema
   modePeta: ModePeta
   tigaD: boolean
+  /** Lapis konteks yang sudah termuat (pola ruang, geologi). Tidak bergantung pada dataset laju. */
+  konteks: Partial<Record<JenisLapis, LapisKonteks>>
+  /** Lapis konteks yang ditampilkan di peta. null = hanya laju. */
+  lapisKonteks: JenisLapis | null
 
   muatDemo: () => Promise<void>
   pakaiDataset: (ds: Dataset, grid?: Grid | null) => void
@@ -65,7 +70,10 @@ export interface AppState {
   setTema: (t: Tema) => void
   setModePeta: (m: ModePeta) => void
   setTigaD: (v: boolean) => void
+  setLapisKonteks: (l: JenisLapis | null) => void
 }
+
+let konteksDiminta = false
 
 export const useApp = create<AppState>()((set, get) => ({
   status: 'memuat',
@@ -82,9 +90,20 @@ export const useApp = create<AppState>()((set, get) => ({
   tema: temaAwal(),
   modePeta: 'laju',
   tigaD: true,
+  konteks: {},
+  lapisKonteks: null,
 
   muatDemo: async () => {
     set({ status: 'memuat', galat: null })
+    // lapis konteks kecil dan tidak wajib: dimuat sekali, di samping data utama
+    if (!konteksDiminta) {
+      konteksDiminta = true
+      for (const j of JENIS_LAPIS) {
+        void ambilKonteks(j).then((l) => {
+          if (l) set((s) => ({ konteks: { ...s.konteks, [j]: l } }))
+        })
+      }
+    }
     try {
       const [ds, grid] = await Promise.all([ambilDatasetDemo(), ambilGrid(GRID_URL)])
       get().pakaiDataset(ds, grid)
@@ -160,6 +179,7 @@ export const useApp = create<AppState>()((set, get) => ({
   },
   setModePeta: (modePeta) => set({ modePeta }),
   setTigaD: (tigaD) => set({ tigaD }),
+  setLapisKonteks: (lapisKonteks) => set({ lapisKonteks }),
 }))
 
 /** Hook: bacaan untuk satu titik (blok piksel bila ada grid, kelurahan bila tidak). null = di luar wilayah. */

@@ -64,6 +64,11 @@ export const NOMINATIM = {
 
 export const DATA_URL = `${import.meta.env.BASE_URL}data/semarang-kawasan.geojson`
 export const GRID_URL = `${import.meta.env.BASE_URL}data/semarang-grid.json`
+/** Lapis konteks (pipeline/07_konteks.py). */
+export const KONTEKS_URL = {
+  rtrw: `${import.meta.env.BASE_URL}data/konteks-rtrw.geojson`,
+  geologi: `${import.meta.env.BASE_URL}data/konteks-geologi.geojson`,
+} as const
 export const MAKS_BANDING = 3
 
 /** ASUMSI: laporan titik dihitung dari blok BLOK_PIKSEL x BLOK_PIKSEL piksel di sekitar titik

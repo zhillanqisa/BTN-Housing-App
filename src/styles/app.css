@@ -235,6 +235,57 @@
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
 }
 
+/* Label kelurahan yang memuat titik terpilih, duduk di tepi utara batasnya. */
+.pa-label-kel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
+  background: #16161d;
+  color: #fff;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 10px 24px rgb(0 0 0 / 0.28);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: pa-label-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.pa-label-kel::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgb(198 241 53 / 0.25);
+}
+.pa-label-kel b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.pa-label-kel small {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+@keyframes pa-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* MapLibre: atribusi dan popup mengikuti tema */
 .maplibregl-map {
   font-family: var(--font-sans);
@@ -265,6 +316,7 @@
 @media (prefers-reduced-motion: reduce) {
   .pa-enter,
   .pa-fade,
+  .pa-label-kel,
   .pa-marker::before {
     animation: none;
   }

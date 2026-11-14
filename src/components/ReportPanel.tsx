@@ -6,6 +6,7 @@ import { CircleNotch, DownloadSimple, LinkSimple, MapPin, Scales, X } from '@pho
 import { batasan, MAKS_BANDING, PRINSIP, TENORS } from '../lib/config'
 import { fmt, fmtKoordinat, fmtPeriode } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
+import { konteksDi, LABEL_LAPIS, statKelas, type FiturKonteks, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { kunciTitik, LABEL_TITIK } from '../lib/lokasi'
 import { kalimatStatus, klasifikasi, langkahBerikutnya, teksLaju } from '../lib/risk'
 import { navigasi } from '../lib/router'
@@ -44,6 +45,79 @@ function Langkah({ kategori }: { kategori: Kategori }) {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/** Bacaan geologi terhadap angka yang terukur. Hanya untuk satuan bawaan (Qa, Tb). */
+function kalimatGeologi(kode: string, laju: number | null): string | null {
+  if (laju == null) return null
+  if (kode === 'Qa') {
+    return laju >= 2
+      ? 'Sesuai pola umum: ambles cepat di Semarang terpusat di endapan aluvial seperti di sini.'
+      : 'Endapan aluvial tidak selalu ambles cepat. Di sekitar titik ini satelit mencatat laju rendah, tetapi tetap tanyakan riwayat urukan dan jenis pondasi.'
+  }
+  if (kode === 'Tb') {
+    return laju >= 2
+      ? 'Tidak biasa untuk perbukitan. Bisa karena tanah urukan atau gerakan lereng, jadi perlu dicek di lapangan.'
+      : 'Sesuai pola umum: perbukitan di Semarang hampir tidak ambles.'
+  }
+  return null
+}
+
+function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: LapisKonteks; f: FiturKonteks; laju: number | null }) {
+  const lapisKonteks = useApp((s) => s.lapisKonteks)
+  const setLapisKonteks = useApp((s) => s.setLapisKonteks)
+  const st = statKelas(lapis, f.nama)
+  const tampil = lapisKonteks === jenis
+  const bacaan = jenis === 'geologi' ? kalimatGeologi(f.kode, laju) : null
+  return (
+    <div className="rounded-[14px] bg-surface-2 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11.5px] font-semibold text-ink-3">{LABEL_LAPIS[jenis]}</span>
+        <button
+          type="button"
+          aria-pressed={tampil}
+          onClick={() => setLapisKonteks(tampil ? null : jenis)}
+          className="text-[11.5px] font-semibold text-ink underline underline-offset-2"
+        >
+          {tampil ? 'Sembunyikan di peta' : 'Tampilkan di peta'}
+        </button>
+      </div>
+      <div className="mt-1 flex items-center gap-2">
+        <span aria-hidden="true" className="size-3.5 shrink-0 rounded-[4px] ring-1 ring-black/10" style={{ background: f.warna }} />
+        <span className="text-[14px] font-bold text-ink">{f.nama}</span>
+        {f.fungsi && <span className="text-[12px] text-ink-3">{f.fungsi}</span>}
+      </div>
+      {f.batuan && <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{f.batuan}.</p>}
+      {f.sifat && <p className="mt-1 text-[12.5px] leading-snug text-ink">{f.sifat}</p>}
+      {bacaan && <p className="mt-1 text-[12.5px] font-semibold leading-snug text-ink">{bacaan}</p>}
+      <p className="mt-1.5 text-[11.5px] leading-snug text-ink-3">
+        {st?.median != null && `Median laju kelas ini di seluruh kota ${fmt(Math.max(0, st.median), 1)} cm/tahun dari ${fmt(st.nPiksel)} piksel. `}
+        {lapis.meta.jenis === 'perkiraan' ? 'Batasnya perkiraan dari bentuk lahan, bukan peta geologi resmi.' : `${lapis.meta.judul}${lapis.meta.skala ? `, skala ${lapis.meta.skala}` : ''}.`}
+      </p>
+    </div>
+  )
+}
+
+/** Kelurahan, pola ruang, dan geologi di titik terpilih. */
+function KonteksLokasi({ lngLat, laju }: { lngLat: [number, number]; laju: number | null }) {
+  const konteks = useApp((s) => s.konteks)
+  const baris = (['rtrw', 'geologi'] as const).flatMap((j) => {
+    const lapis = konteks[j]
+    const f = konteksDi(lapis, lngLat)
+    return lapis && f ? [{ j, lapis, f }] : []
+  })
+  if (!baris.length) return null
+  return (
+    <div className="border-t border-line pt-4">
+      <JudulBagian>Konteks lokasi</JudulBagian>
+      <div className="mt-2 space-y-2">
+        {baris.map(({ j, lapis, f }) => (
+          <BarisKonteks key={j} jenis={j} lapis={lapis} f={f} laju={laju} />
+        ))}
+      </div>
+      <p className="mt-2 text-[11.5px] leading-snug text-ink-3">Konteks membantu membaca angka, tetapi tidak mengubah kategori. Kategori tetap hanya dari laju yang terukur.</p>
     </div>
   )
 }
@@ -194,6 +268,8 @@ export default function ReportPanel({ pegangan }: { pegangan?: ReactNode }) {
                 {titik && ` Sebagai konteks, rata-rata Kelurahan ${kel.nama}: ${rataKelurahan}. Itu rata-rata kawasan, bukan angka di titik ini.`}
               </Notice>
             )}
+
+            <KonteksLokasi lngLat={selection.lngLat} laju={adaData ? k.laju : null} />
 
             <div className="border-t border-line pt-4">
               <Langkah key={`${kunci}-${kategori}`} kategori={kategori} />

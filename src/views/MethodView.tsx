@@ -1,15 +1,16 @@
 // Halaman "Data & metode": dari mana angkanya, cara membacanya, batasannya,
 // hasil validasi, dan tempat mengunggah data per kelurahan (CSV / GeoJSON).
 // Status tiap langkah dan sumber dihitung dari metadata dataset, bukan ditulis mati.
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowCounterClockwise, ArrowRight, DownloadSimple, UploadSimple } from '@phosphor-icons/react'
-import { batasan, LABEL_KATEGORI, PRINSIP, TENORS, URUTAN_KATEGORI } from '../lib/config'
+import { batasan, KONTEKS_URL, LABEL_KATEGORI, PRINSIP, TENORS, URUTAN_KATEGORI } from '../lib/config'
 import { keDataset, unduhBerkas } from '../lib/data'
 import { fmt, fmtPeriode, fmtTanggal } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
 import { imporCSV, imporGeoJSON, templatCSV, type HasilImpor } from '../lib/importer'
+import { JENIS_LAPIS, LABEL_LAPIS, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { hitungProyeksi, kalimatProyeksi } from '../lib/risk'
-import { navigasi } from '../lib/router'
+import { navigasi, useRute } from '../lib/router'
 import { useApp } from '../lib/store'
 import type { DatasetMeta, Kategori, Tenor } from '../lib/types'
 import { Button, Card, Chip, cx, Notice, Segmented, Skeleton, Swatch } from '../ui/primitives'
@@ -20,12 +21,22 @@ const BAGIAN = [
   ['proyeksi', 'Proyeksi Tenor'],
   ['alur', 'Alur olah data'],
   ['sumber', 'Sumber data'],
+  ['konteks', 'Lapis konteks'],
   ['validasi', 'Validasi'],
   ['batasan', 'Batasan'],
   ['ganti-data', 'Unggah data'],
 ] as const
 
-type StatusPil = 'Selesai' | 'Dipakai' | 'Sudah di demo' | 'Rencana' | 'Lisensi belum jelas' | 'Tidak tersedia terbuka' | 'Tidak tercatat'
+type StatusPil =
+  | 'Selesai'
+  | 'Dipakai'
+  | 'Sudah di demo'
+  | 'Rencana'
+  | 'Lisensi belum jelas'
+  | 'Tidak tersedia terbuka'
+  | 'Tidak tercatat'
+  | 'Perkiraan'
+  | 'Perlu akun'
 
 /** Catatan proses hanya dipercaya bila dataset memang ditandai hasil olahan. */
 const prosesOlahan = (meta: DatasetMeta | null) => (meta?.jenis === 'olahan' ? meta.proses : undefined)
@@ -73,22 +84,153 @@ function susunAlur(meta: DatasetMeta | null): { judul: string; isi: string; stat
   ]
 }
 
-function susunSumber(meta: DatasetMeta | null): [string, string, StatusPil][] {
+function susunSumber(meta: DatasetMeta | null, konteks: Partial<Record<JenisLapis, LapisKonteks>>): [string, string, StatusPil][] {
   const p = prosesOlahan(meta)
-  const konteks = new Set(p?.konteks ?? [])
-  const lapis = (kunci: string, bila: StatusPil): StatusPil => (konteks.has(kunci) ? 'Dipakai' : bila)
+  const geologiResmi = konteks.geologi?.meta.jenis === 'resmi'
   return [
-    ['Batas kelurahan (OpenStreetMap)', 'Nama lokasi dan ringkasan', 'Dipakai'],
+    ['Batas kelurahan (OpenStreetMap)', 'Nama lokasi, garis batas, dan ringkasan', 'Dipakai'],
     ['Peta dasar (OpenFreeMap, OpenMapTiles)', 'Tampilan peta', 'Dipakai'],
     ['Pencarian alamat (Nominatim)', 'Cari lokasi', 'Dipakai'],
     ['Sentinel-1 lewat ASF HyP3', 'Laju penurunan', p ? 'Dipakai' : 'Rencana'],
     ['GNSS CORS Pantura (Susilo dkk. 2023)', 'Titik ikat dan validasi', p?.validasi?.gnss?.length ? 'Dipakai' : 'Rencana'],
-    ['DEM Copernicus GLO-30', 'Konteks elevasi', lapis('elevasi', 'Rencana')],
-    // Tiga baris berikut: hasil cek layanan publik pada 13 November 2026 (lihat catatan di bawah tabel).
-    ['Bahaya banjir dan abrasi (InaRISK BNPB)', 'Konteks rob', lapis('rob', 'Lisensi belum jelas')],
-    ['Tata ruang (GISTARU)', 'Konteks kawasan', lapis('tata-ruang', 'Tidak tersedia terbuka')],
-    ['Peta geologi 1:100.000', 'Penjelasan penyebab', lapis('geologi', 'Tidak tersedia terbuka')],
+    ['DEM Copernicus GLO-30', 'Koreksi saat olah, dan perkiraan satuan geologi', p || konteks.geologi ? 'Dipakai' : 'Rencana'],
+    // Baris berikut: hasil cek layanan publik pada 13 dan 14 November 2026 (lihat catatan di bawah tabel).
+    ['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)', konteks.rtrw ? 'Dipakai' : 'Rencana'],
+    ['RTRW Kota Semarang (GISTARU, geoportal Pemkot)', 'Pola ruang rinci', 'Tidak tersedia terbuka'],
+    ['Peta geologi PSG 1:100.000 dan Kuarter 1:50.000', 'Satuan geologi resmi', geologiResmi ? 'Dipakai' : 'Perlu akun'],
+    ['Satuan geologi dari bentuk lahan', 'Lapis geologi sementara', konteks.geologi && !geologiResmi ? 'Perkiraan' : 'Rencana'],
+    ['Bahaya banjir dan abrasi (InaRISK BNPB)', 'Konteks rob', 'Lisensi belum jelas'],
   ]
+}
+
+/** Tabel statistik laju per kelas dari satu lapis konteks. */
+function TabelKonteks({ lapis }: { lapis: LapisKonteks }) {
+  const st = lapis.meta.statistik
+  if (!st.length) return null
+  return (
+    <div className="overflow-x-auto">
+      <table className="tnum w-full min-w-[520px] text-left text-[13px]">
+        <thead className="text-ink-3">
+          <tr>
+            <th scope="col" className="py-2 pr-3 font-medium">
+              Kelas
+            </th>
+            <th scope="col" className="py-2 pr-3 text-right font-medium">
+              Luas (km²)
+            </th>
+            <th scope="col" className="py-2 pr-3 text-right font-medium">
+              Piksel terukur
+            </th>
+            <th scope="col" className="py-2 pr-3 text-right font-medium">
+              Median laju (cm/th)
+            </th>
+            <th scope="col" className="py-2 text-right font-medium">
+              Piksel ≥ 4 cm/th
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {st.map((s) => (
+            <tr key={s.nama} className="border-t border-line">
+              <th scope="row" className="py-2 pr-3 font-semibold text-ink">
+                <span className="inline-flex items-center gap-2">
+                  <span aria-hidden="true" className="size-3 shrink-0 rounded-[4px] ring-1 ring-black/10" style={{ background: s.warna }} />
+                  {s.nama}
+                </span>
+              </th>
+              <td className="py-2 pr-3 text-right">{fmt(s.luasKm2, 1)}</td>
+              <td className="py-2 pr-3 text-right">{fmt(s.nPiksel)}</td>
+              <td className="py-2 pr-3 text-right font-semibold text-ink">{s.median != null ? fmt(s.median, 1) : 'terlalu sedikit'}</td>
+              <td className="py-2 text-right">{s.porsiTinggi != null ? `${fmt(s.porsiTinggi * 100)}%` : '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/** Kesimpulan singkat dari lapis geologi bawaan (satuan Qa dan Tb). */
+function ringkasGeologi(lapis: LapisKonteks): string | null {
+  const a = lapis.meta.statistik.find((s) => s.nama === 'Dataran aluvial')
+  const b = lapis.meta.statistik.find((s) => s.nama === 'Perbukitan')
+  if (a?.median == null || b?.median == null) return null
+  return `Median laju di dataran aluvial ${fmt(Math.max(0, a.median), 1)} cm/tahun dan ${fmt((a.porsiTinggi ?? 0) * 100)}% pikselnya turun minimal 4 cm/tahun. Di perbukitan median ${fmt(Math.max(0, b.median), 1)} cm/tahun, dan piksel yang turun secepat itu hanya ${fmt((b.porsiTinggi ?? 0) * 100)}%.`
+}
+
+function BagianKonteks({ konteks }: { konteks: Partial<Record<JenisLapis, LapisKonteks>> }) {
+  const ada = JENIS_LAPIS.filter((j) => konteks[j])
+  return (
+    <>
+      <p>
+        Dua lapis tambahan membantu membaca angka laju: pola ruang dari RTRW dan geologi permukaan. Keduanya bisa ditampilkan di peta lewat pilihan Lapis konteks di legenda, dan kelas di titik terpilih muncul
+        di laporan. Lapis konteks tidak mengubah kategori. Kategori tetap hanya dari laju yang terukur satelit.
+      </p>
+      <p>Tabel di bawah menghitung laju dari piksel yang sama dengan yang tampil di peta, dikelompokkan menurut kelas tiap lapis.</p>
+      {!ada.length && <p className="text-ink-3">Lapis konteks belum termuat.</p>}
+      {ada.map((j) => {
+        const l = konteks[j]!
+        const kesimpulan = j === 'geologi' && l.meta.jenis === 'perkiraan' ? ringkasGeologi(l) : null
+        return (
+          <div key={j} className="space-y-2 border-t border-line pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-[16px] font-bold text-ink">{LABEL_LAPIS[j]}</h3>
+              <Pil teks={l.meta.jenis === 'perkiraan' ? 'Perkiraan' : 'Dipakai'} />
+            </div>
+            <p className="text-[13.5px] font-semibold text-ink">
+              {l.meta.judul}
+              {l.meta.skala ? `, ${l.meta.skala}` : ''}
+            </p>
+            {l.meta.catatan && <p className="text-[13.5px]">{l.meta.catatan}</p>}
+            {l.meta.aturan && <p className="text-[13.5px]">Aturan: {l.meta.aturan}</p>}
+            {kesimpulan && <p className="text-[13.5px] font-semibold text-ink">{kesimpulan}</p>}
+            {j === 'geologi' && l.meta.jenis === 'perkiraan' && (
+              <p className="text-[13.5px]">
+                Di peta terlihat ambles cepat terpusat di dataran aluvial bagian utara dan timur, sedangkan dataran aluvial di barat relatif stabil. Artinya berada di endapan aluvial tidak otomatis berarti ambles
+                cepat. Angka pengukuran di titik itu tetap yang utama.
+              </p>
+            )}
+            {j === 'rtrw' && (
+              <p className="text-[13.5px]">
+                Pada skala provinsi sebagian besar kota tercatat sebagai Kawasan Permukiman, jadi statistik per kelas hanya gambaran kasar. Kelas dengan laju tinggi, seperti kawasan transportasi di pelabuhan, bandara,
+                dan sekitarnya, tetap memberi petunjuk di mana infrastruktur besar ikut terdampak.
+              </p>
+            )}
+            <TabelKonteks lapis={l} />
+            {l.meta.sumber.length > 0 && (
+              <ul className="list-disc space-y-1 pl-5 text-[13px]">
+                {l.meta.sumber.map((s) => (
+                  <li key={s.nama}>
+                    {s.url ? (
+                      <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-2">
+                        {s.nama}
+                      </a>
+                    ) : (
+                      <span className="text-ink">{s.nama}</span>
+                    )}
+                    {s.catatan ? ` ${s.catatan}` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <a href={KONTEKS_URL[j]} download className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink underline underline-offset-2">
+              <DownloadSimple size={15} aria-hidden="true" />
+              Unduh lapis ini (GeoJSON)
+            </a>
+          </div>
+        )
+      })}
+      <div className="border-t border-line pt-4 text-[13.5px]">
+        <h3 className="text-[16px] font-bold text-ink">Mengganti dengan data resmi</h3>
+        <p className="mt-1">
+          Kedua lapis disimpan juga sebagai shapefile di folder <code className="font-mono text-[12.5px] text-ink">data-raw/konteks</code> pada repositori. Bila tim memperoleh RTRW Kota Semarang (Perda Nomor 14
+          Tahun 2011, diubah dengan Perda Nomor 5 Tahun 2021) atau hasil digitasi peta geologi Pusat Survei Geologi, jalankan{' '}
+          <code className="font-mono text-[12.5px] text-ink">pipeline/07_konteks.py --rtrw</code> atau <code className="font-mono text-[12.5px] text-ink">--geologi</code> dengan file itu. Statistik dan peta ikut
+          diperbarui.
+        </p>
+      </div>
+    </>
+  )
 }
 
 const ARTI: Record<Kategori, string> = {
@@ -105,7 +247,7 @@ function Pil({ teks }: { teks: string }) {
         'inline-flex h-6 shrink-0 items-center rounded-full border px-2.5 text-[11.5px] font-semibold',
         teks === 'Dipakai' || teks === 'Sudah di demo' || teks === 'Selesai'
           ? 'border-transparent bg-ink text-surface'
-          : teks === 'Lisensi belum jelas'
+          : teks === 'Lisensi belum jelas' || teks === 'Perkiraan'
             ? 'border-notice-line bg-notice-bg text-notice-ink'
             : 'border-line-2 text-ink-2',
       )}
@@ -342,11 +484,18 @@ export default function MethodView() {
   const kawasan = useApp((s) => s.kawasan)
   const grid = useApp((s) => s.grid)
   const t = useApp((s) => s.thresholds)
+  const konteks = useApp((s) => s.konteks)
+  const rute = useRute()
   const memadai = kawasan.filter((k) => k.memadai).length
   const titik = !!grid
   const lebarBlok = lebarBlokM(grid)
   const alur = susunAlur(meta)
-  const sumber = susunSumber(meta)
+  const sumber = susunSumber(meta, konteks)
+  // tautan dari legenda peta: #/metode?bagian=konteks
+  const bagian = rute.params.get('bagian')
+  useEffect(() => {
+    if (bagian) document.getElementById(bagian)?.scrollIntoView({ block: 'start' })
+  }, [bagian])
   const proses = prosesOlahan(meta)
   const validasi = proses?.validasi
   const belumJalan = alur.filter((a) => a.status === 'Rencana').length
@@ -465,8 +614,8 @@ export default function MethodView() {
             </table>
           </div>
           <p>
-            Kategori hanya berasal dari laju penurunan. Konteks lain seperti rob, elevasi, dan guna lahan direncanakan sebagai lapisan terpisah. Semuanya belum digabung menjadi satu skor karena data dan bobotnya belum
-            terverifikasi.
+            Kategori hanya berasal dari laju penurunan. Pola ruang dan geologi tampil sebagai lapis konteks terpisah, dan rob belum ada karena data terbukanya belum layak pakai (lihat Sumber data). Karena itu
+            tidak ada skor gabungan.
           </p>
           <p>Ambang kategori masih asumsi awal dan terbuka untuk diuji.</p>
           <Button ukuran="sm" onClick={() => navigasi('dashboard')} ikon={<ArrowRight size={16} />}>
@@ -537,10 +686,18 @@ export default function MethodView() {
             </table>
           </div>
           <p className="text-[13px]">
-            Tiga sumber konteks terakhir dicek pada 13 November 2026 dan belum dipakai. Layanan peta InaRISK BNPB bisa diakses publik, tetapi tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis genangan rob
-            khusus. Layanan data tata ruang GISTARU meminta token akses. Peta geologi hanya tersedia lewat penampil web. Untuk rob dan tata ruang, tanyakan langsung ke dinas terkait.
+            Sumber konteks dicek pada 13 dan 14 November 2026. RTRW Kota Semarang tidak bisa diambil: layanan GISTARU meminta token, sedangkan geoportal Pemkot dan Satu Peta BIG tidak merespons. Karena itu lapis pola
+            ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Layanan peta geologi ESDM sedang pemeliharaan, dan raster peta Pusat Survei Geologi di GeoMap hanya bisa diunduh dengan akun,
+            jadi lapis geologi sementara diperkirakan dari bentuk lahan. Layanan InaRISK BNPB bisa diakses publik, tetapi tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis genangan rob khusus.
+          </p>
+          <p className="text-[13px]">
+            Elevasi tidak ditampilkan sebagai konteks. Galat DEM global beberapa meter, terlalu kasar untuk menilai rob di pesisir yang tingginya hanya satu sampai tiga meter di atas laut.
           </p>
           <p className="text-[13px]">Batas wilayah © OpenStreetMap contributors (ODbL). Peta dasar OpenFreeMap © OpenMapTiles, data OpenStreetMap.</p>
+        </Bagian>
+
+        <Bagian id="konteks" judul="Lapis konteks: tata ruang dan geologi">
+          <BagianKonteks konteks={konteks} />
         </Bagian>
 
         <Bagian id="validasi" judul="Validasi">
@@ -552,7 +709,7 @@ export default function MethodView() {
                   <>
                     <dt className="text-ink-3">Dua lintasan satelit</dt>
                     <dd className="text-ink">
-                      selisih RMSE {fmt(validasi.antarLintasan.rmse, 2)} cm/tahun, bias {fmt(validasi.antarLintasan.bias, 2)} cm/tahun, korelasi {fmt(validasi.antarLintasan.r, 2)}, dari{' '}
+                      selisih RMSE {fmt(validasi.antarLintasan.rmse, 2)} cm/tahun, bias {fmt(validasi.antarLintasan.bias, 2)} cm/tahun, korelasi {fmt(validasi.antarLintasan.r, 3)}, dari{' '}
                       {fmt(validasi.antarLintasan.n)} piksel
                     </dd>
                   </>

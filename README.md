@@ -2,11 +2,13 @@
 
 **Cek Tanah Sebelum KPR.** Web app untuk melihat laju penurunan tanah di sekitar sebuah titik di Kota Semarang dan proyeksinya selama masa cicilan KPR (Proyeksi Tenor). Dibuat untuk BTN Housingpreneur Batch 3, kategori Housing Innovation.
 
-Laporan mengikuti titik yang dipilih: angkanya dihitung dari blok piksel sekitar 240 m di sekitar titik itu, bukan rata-rata satu kelurahan. Dua titik dalam kelurahan yang sama bisa memberi hasil berbeda.
+Laporan mengikuti titik yang dipilih: angkanya dihitung dari blok piksel sekitar 240 m di sekitar titik itu, bukan rata-rata satu kelurahan. Dua titik dalam kelurahan yang sama bisa memberi hasil berbeda. Saat titik dipilih, batas kelurahannya disorot di peta.
+
+Dua lapis konteks bisa ditumpangkan di peta dan muncul di laporan: pola ruang RTRW dan geologi permukaan, masing-masing dengan laju median per kelas sebagai bahan analisis.
 
 **Demo:** https://zhillanqisa.github.io/BTN-Housing-App/
 
-> **Status data:** peta saat ini memakai **data demo ilustratif**, bukan hasil pengukuran. Pola angkanya meniru rentang publikasi supaya antarmuka bisa didemokan. Olahan Sentinel-1 tim belum dijalankan. Jangan memakai angka di aplikasi ini untuk keputusan.
+> **Status data:** peta memakai **hasil olah InSAR Sentinel-1** Januari 2020 sampai November 2026 (1.433 interferogram dari dua arah lintasan satelit, piksel 80 m). 82% piksel kota terukur. Laju dari dua lintasan yang saling independen cocok dengan RMSE 0,34 cm/tahun, dan perbukitan selatan terukur stabil. Belum ada pembanding lapangan di kawasan yang ambles, jadi angka ini bahan pertimbangan, bukan satu-satunya dasar keputusan. Rincian di [pipeline/README.md](pipeline/README.md).
 
 ## Menjalankan
 
@@ -25,7 +27,8 @@ Hasil `dist/` berupa file statis dan bisa di-host gratis (GitHub Pages, Netlify,
 
 ## Alur demo yang disarankan
 
-1. Di halaman **Cek lokasi**, klik kartu contoh "Tanah Mas" atau cari alamat, atau klik titik mana pun di peta. Kotak hijau di peta menandai blok piksel yang dipakai untuk laporan.
+1. Di halaman **Cek lokasi**, klik kartu contoh "Tanah Mas" atau cari alamat, atau klik titik mana pun di peta. Kotak hijau di peta menandai blok piksel yang dipakai untuk laporan, dan garis bercahaya menandai batas kelurahannya.
+   Di legenda, pilih **Lapis konteks** RTRW atau Geologi untuk menumpangkan pola ruang atau satuan geologi. Bagian **Konteks lokasi** di laporan menyebut kelas di titik itu.
 2. Baca **Laporan Ambles**: status di titik itu, grafik riwayat, lalu Proyeksi Tenor. Coba klik titik lain di kelurahan yang sama dan bandingkan angkanya.
 3. Ganti tenor 10, 15, 20 tahun dan lihat rumah pada gambar ikut turun.
 4. Tekan **Unduh PDF** untuk laporan satu halaman.
@@ -47,6 +50,7 @@ src/
     risk.ts            kategori, Proyeksi Tenor, kalimat laporan
     grid.ts            grid piksel: baca file, nilai piksel, statistik blok di sekitar titik
     lokasi.ts          bacaan satu lokasi (blok piksel, atau kelurahan bila data tanpa grid)
+    konteks.ts         lapis konteks (pola ruang RTRW, geologi): muat, validasi, kelas di satu titik
     data.ts            muat dan validasi ringkasan per kelurahan
     importer.ts        impor CSV / GeoJSON
     pdf.ts             PDF Laporan Ambles (jsPDF, vektor)
@@ -56,8 +60,10 @@ src/
   styles/app.css       token desain (terang dan gelap)
 scripts/
   fetch-boundaries.mjs batas kelurahan dari OpenStreetMap (npm run data:boundaries)
-  build-demo-data.mjs  data demo ilustratif: grid piksel dan ringkasan kelurahan (npm run data:demo)
+  build-demo-data.mjs  data demo ilustratif untuk uji antarmuka (npm run data:demo, menolak menimpa hasil olah asli tanpa --paksa)
+pipeline/              olah InSAR dari citra Sentinel-1 sampai file di public/data, dan lapis konteks (Python, lihat pipeline/README.md)
 data-raw/              batas kelurahan, kecamatan, kota (hasil skrip)
+data-raw/konteks/      shapefile pola ruang RTRW dan geologi permukaan, bisa disunting di QGIS
 public/data/           semarang-grid.* (grid piksel) dan semarang-kawasan.geojson, dibaca aplikasi
 ```
 
@@ -73,12 +79,12 @@ Aplikasi membaca dua kelompok file di `public/data/`.
 
 ```json
 {
-  "versi": 1, "jenis": "olahan", "dibuat": "2026-12-01",
+  "versi": 1, "jenis": "olahan", "dibuat": "2026-11-14",
   "bbox": [110.26, -7.12, 110.51, -6.92],
   "nx": 336, "ny": 260, "ukuranSelM": 80,
   "nodata": -32768, "luar": -32767,
   "skalaLaju": 0.01, "skalaDeret": 0.1,
-  "epoch": [2020.0, 2020.25],
+  "epoch": [2020.125, 2020.375],
   "berkas": { "laju": "semarang-grid-laju.bin", "sigma": "semarang-grid-sigma.bin", "deret": "semarang-grid-deret.bin" }
 }
 ```
@@ -86,6 +92,7 @@ Aplikasi membaca dua kelompok file di `public/data/`.
 - `bbox`: `[barat, selatan, timur, utara]` tepi luar grid, derajat WGS84.
 - Nilai laju dan sigma × `skalaLaju` = cm/tahun, **positif berarti turun**. Nilai deret × `skalaDeret` = cm, negatif berarti turun.
 - `nodata`: piksel di dalam kota yang tidak terukur. `luar`: piksel di luar batas kota.
+- `epoch`: tahun desimal titik tengah tiap triwulan. Deret dihitung relatif ke epoch pertama.
 - Laporan titik memakai blok 3 × 3 piksel di sekitar titik: laju = median piksel terukur, dan dianggap memadai bila minimal 4 piksel terukur.
 
 Bila file grid tidak ada, aplikasi tetap jalan dan memakai rata-rata kelurahan.
@@ -125,32 +132,28 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 - `deret`: pasangan tahun desimal dan perpindahan kumulatif dalam cm (negatif berarti turun).
 - `metadata.jenis`: `demo`, `olahan`, atau `unggahan`. Selama `demo`, aplikasi dan PDF menampilkan penanda data demo.
 
-## Mengganti data demo dengan hasil olahan tim
+### Lapis konteks (peta dan laporan)
 
-1. **Lewat aplikasi:** halaman Data & metode, bagian Unggah data. Unggah GeoJSON lengkap, atau CSV (`id;nama;kecamatan;laju;sigma;n_piksel;koherensi`) yang digabung ke batas kelurahan. Templat CSV bisa diunduh di sana. Data unggahan hanya hidup di peramban dan tidak membawa grid, jadi selama dipakai, peta dan laporan beralih ke rata-rata kelurahan.
-2. **Permanen:** ganti file grid dan `public/data/semarang-kawasan.geojson` dengan file berskema sama, set `jenis` menjadi `olahan`.
-3. **Dari MintPy:** sketsa awal untuk ringkasan kelurahan ada di bawah. **Belum pernah dijalankan**, sesuaikan nama file dan ambang. Pipeline lengkap (termasuk penulisan grid) sedang disiapkan di folder `pipeline/`.
+`konteks-rtrw.geojson` dan `konteks-geologi.geojson`, ditulis oleh `pipeline/07_konteks.py`. Satu fitur = satu kelas.
 
-```python
-import geopandas as gpd, json
-from rasterstats import zonal_stats
+- Properti fitur: `kode`, `nama`, `warna` (hex). RTRW menambah `fungsi` (Lindung atau Budi daya). Geologi menambah `batuan` dan `sifat`.
+- `metadata`: `judul`, `jenis` (`resmi` atau `perkiraan`), `skala`, `sumber`, `catatan`, `aturan` (geologi perkiraan), dan `statistik`: per kelas `luasKm2`, `nPiksel`, `cakupan`, `median`, `p75`, `porsiTinggi` (bagian piksel yang turun minimal 4 cm/tahun).
+- Lapis konteks tidak mengubah kategori. Bila file tidak ada, aplikasi tetap jalan tanpa pilihan lapis itu.
 
-kel = gpd.read_file("data-raw/semarang-kelurahan.geojson")
-# velocity_vertikal_mm.tif: laju vertikal mm/tahun dari MintPy, negatif = turun
-z = zonal_stats(kel, "velocity_vertikal_mm.tif", stats=["median", "std", "count"])
-koh = zonal_stats(kel, "koherensi_rata.tif", stats=["mean"])
-fitur = []
-for (_, r), s, c in zip(kel.iterrows(), z, koh):
-    memadai = (s["count"] or 0) >= 30 and (c["mean"] or 0) >= 0.32
-    fitur.append({"type": "Feature", "geometry": r.geometry.__geo_interface__, "properties": {
-        "id": r["id"], "nama": r["nama"], "kecamatan": r["kecamatan"],
-        "laju": round(-s["median"] / 10, 1) if memadai else None,   # mm ke cm, positif = turun
-        "sigma": round(s["std"] / 10, 1) if memadai else None,
-        "nPiksel": s["count"] or 0, "koherensi": c["mean"], "memadai": memadai,
-        "deret": [], "jarakPantaiKm": None}})
-json.dump({"type": "FeatureCollection", "metadata": {"jenis": "olahan"}, "features": fitur},
-          open("public/data/semarang-kawasan.geojson", "w"))
-```
+| Lapis | Sumber saat ini | Catatan |
+|---|---|---|
+| Pola ruang | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000. RTRW Kota Semarang yang rinci tidak bisa diambil pada 14 November 2026 |
+| Geologi | Perkiraan dari bentuk lahan pada DEM Copernicus GLO-30: dataran rendah datar yang tersambung ke pantai dianggap endapan aluvial | Bukan peta geologi resmi. Peta Pusat Survei Geologi hanya bisa diunduh dengan akun GeoMap |
+
+Hasil analisis awal: median laju di dataran aluvial 4,9 cm/tahun (55% pikselnya turun minimal 4 cm/tahun), di perbukitan 0,0. Ambles cepat terpusat di aluvial bagian utara dan timur; aluvial di barat relatif stabil.
+
+Untuk mengganti dengan data resmi: `python pipeline/07_konteks.py --rtrw rtrw_kota.shp` (kolom `NAMOBJ`, `KODKWS`) atau `--geologi geologi.shp` (kolom `KODE`, `NAMA`, `BATUAN`, `SIFAT`, `WARNA`).
+
+## Memperbarui data
+
+1. **Olah ulang dari citra satelit:** jalankan pipeline di folder `pipeline/` (enam skrip, urutannya di [pipeline/README.md](pipeline/README.md)). Langkah terakhir menulis file grid dan ringkasan kelurahan ke `public/data/`. Butuh akun NASA Earthdata gratis dan sekitar 25 GB unduhan sementara.
+2. **Lewat aplikasi:** halaman Data & metode, bagian Unggah data. Unggah GeoJSON lengkap, atau CSV (`id;nama;kecamatan;laju;sigma;n_piksel;koherensi`) yang digabung ke batas kelurahan. Templat CSV bisa diunduh di sana. Data unggahan hanya hidup di peramban dan tidak membawa grid, jadi selama dipakai, peta dan laporan beralih ke rata-rata kelurahan.
+3. **Data demo untuk uji antarmuka:** `npm run data:demo -- --paksa` menimpa `public/data/` dengan data ilustratif. Jangan di-commit ke cabang yang diterbitkan.
 
 ## Rencana realisasi
 
@@ -160,7 +163,7 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 
 **Definisi keberhasilan MVP (USULAN, perlu disepakati tim).** Seorang calon pembeli, tanpa bantuan, dapat mencari satu lokasi di Kota Semarang, membaca kategori dan Proyeksi Tenor, lalu mengunduh PDF dalam waktu kurang dari 2 menit. Diuji ke minimal 20 responden, target minimal 80% menjawab benar dua pertanyaan pemahaman (arti kategori, dan arti "jika tren bertahan").
 
-**Arsitektur.** Sentinel-1 lewat ASF HyP3, deret waktu MintPy/SBAS, koreksi atmosfer dan titik referensi stabil, konversi ke laju vertikal, validasi GNSS, agregasi per kelurahan, lalu satu file GeoJSON. Web app statis (Vite, React, MapLibre GL JS) membaca file itu. Tanpa server, hosting gratis.
+**Arsitektur.** Sentinel-1 lewat ASF HyP3, deret waktu MintPy/SBAS, koreksi atmosfer dan titik referensi stabil (stasiun GNSS CSEM), gabung dua lintasan menjadi laju vertikal, validasi antarlintasan, lalu grid piksel dan ringkasan per kelurahan. Web app statis (Vite, React, MapLibre GL JS) membaca file itu. Tanpa server, hosting gratis. Seluruh alur olah sudah dijalankan pada 14 November 2026.
 
 **Antarmuka.** Cari alamat atau klik peta, Laporan Ambles (status, riwayat, Proyeksi Tenor, langkah berikutnya, sumber dan batasan), unduh PDF, bandingkan lokasi. Dashboard untuk institusi. Halaman Data & metode memuat input data.
 
@@ -172,25 +175,35 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 
 - Ambang kategori 2 dan 4 cm/tahun.
 - Unit laporan: blok 3 × 3 piksel (sekitar 240 m) di sekitar titik, memadai bila minimal 4 piksel terukur.
-- Ketidakpastian titik = akar dari (sebaran laju dalam blok² + galat ukur piksel²).
+- Ketidakpastian titik = akar dari (sebaran laju dalam blok² + galat ukur piksel²). Galat ukur piksel paling kecil sama dengan RMSE antarlintasan (0,34 cm/tahun).
 - Ringkasan kelurahan memadai bila minimal 15 piksel terukur dan menutup minimal 20% luasnya.
-- Bila hanya satu lintasan satelit: asumsi gerak dominan vertikal.
-- Model data demo (pola utara-timur makin cepat) hanya ilustrasi.
+- Piksel yang terukur dari satu lintasan saja (9% piksel terukur): asumsi gerak dominan vertikal.
+- Periode olah Januari 2020 sampai November 2026, dan laju = tren linear seluruh periode. Percepatan atau perlambatan dalam periode itu tidak tercermin di angka laju, hanya terlihat di grafik riwayat.
+- Piksel dipakai bila koherensi temporal minimal 0,7.
+- Perbukitan selatan dianggap stabil saat menaksir koreksi atmosfer.
 - Pilihan teknologi: MapLibre GL JS, peta dasar OpenFreeMap, Nominatim.
 - Tanpa Patok Pantau, mengikuti rangkuman proyek versi terakhir (v3).
 - Referensi visual: dua gambar acuan dari tim (peta 3D bernuansa terang, dan peta gelap miring) dipakai sebagai arah tampilan terang dan gelap.
 
 ## Risiko dan hal yang perlu dicek
 
-- Ketersediaan peta genangan rob dan data pasang surut.
-- Unduhan vektor tata ruang (GISTARU) dan format digital peta geologi.
-- Mutu koherensi InSAR di kawasan bervegetasi dan tambak.
-- Validasi di Semarang bagian bawah: stasiun GNSS acuan (CSEM) berada di area stabil.
+- Belum ada pembanding lapangan di kawasan yang ambles. Stasiun GNSS terbuka satu-satunya di kota (CSEM) berada di area stabil dan dipakai sebagai titik ikat. Bila tim memperoleh data sipat datar atau GNSS di Semarang bawah, bandingkan dengan laporan titik di lokasi itu.
+- 18% piksel kota tidak terukur, terutama tambak dan pesisir Tugu serta lereng bervegetasi di Mijen dan Gunungpati. Di sana aplikasi menulis "data tidak memadai".
+- Lapis pola ruang memakai RTRW Provinsi (skala 1:250.000), terlalu kasar untuk memastikan peruntukan satu persil. RTRW Kota Semarang perlu diminta ke Dinas Penataan Ruang atau diakses lewat GISTARU dengan token.
+- Lapis geologi masih perkiraan dari bentuk lahan. Perlu digitasi Peta Geologi Lembar Magelang dan Semarang 1:100.000 serta Peta Geologi Kuarter Lembar Semarang 1:50.000 dari GeoMap (perlu akun).
+- Lapis rob tidak dipakai: InaRISK BNPB tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis rob khusus. Elevasi dari DEM global juga tidak ditampilkan karena galatnya beberapa meter.
+- Data berhenti di November 2026. Pembaruan berarti menjalankan ulang pipeline; belum otomatis.
 - Nominatim: maksimal 1 permintaan per detik dan tanpa autocomplete. Karena itu pencarian alamat hanya dikirim saat tombol Cari ditekan. Untuk pemakaian ramai, siapkan layanan geocoding sendiri.
 - Paket pengembangan `osmtogeojson` membawa dependensi lama (`@xmldom/xmldom`) yang ditandai `npm audit`. Hanya dipakai skrip pengambil batas, tidak ikut ke aplikasi.
 
 ## Lisensi dan atribusi
 
+- Citra radar: berisi data Copernicus Sentinel yang dimodifikasi (2020 sampai 2026), diunduh lewat Alaska Satellite Facility.
+- Interferogram: ASF HyP3. Deret waktu: MintPy (Yunjun, Fattahi & Amelung 2019).
+- Titik ikat GNSS: Susilo dkk. (2023), Zenodo `10.5281/zenodo.7775016`, CC BY 4.0.
+- Pola ruang: RTRW Provinsi Jawa Tengah 2024-2044 (Perda Provinsi Jawa Tengah Nomor 8 Tahun 2024).
+- DEM: Copernicus GLO-30, © DLR e.V. 2010-2014 dan © Airbus Defence and Space GmbH 2014-2018, disediakan di bawah program Copernicus.
+- Nama satuan batuan: Thanden dkk. (1996), Peta Geologi Lembar Magelang dan Semarang, Pusat Survei Geologi.
 - Batas wilayah: © OpenStreetMap contributors (ODbL).
 - Peta dasar: OpenFreeMap, © OpenMapTiles, data OpenStreetMap.
 - Pencarian alamat: Nominatim, [kebijakan pemakaian](https://operations.osmfoundation.org/policies/nominatim/).
