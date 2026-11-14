@@ -8,7 +8,7 @@ import { keDataset, unduhBerkas } from '../lib/data'
 import { fmt, fmtPeriode, fmtTanggal } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
 import { imporCSV, imporGeoJSON, templatCSV, type HasilImpor } from '../lib/importer'
-import { JENIS_LAPIS, LABEL_LAPIS, type JenisLapis, type LapisKonteks } from '../lib/konteks'
+import { JENIS_LAPIS, KODE_ALUVIUM, LABEL_LAPIS, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { hitungProyeksi, kalimatProyeksi } from '../lib/risk'
 import { navigasi, useRute } from '../lib/router'
 import { useApp } from '../lib/store'
@@ -93,12 +93,13 @@ function susunSumber(meta: DatasetMeta | null, konteks: Partial<Record<JenisLapi
     ['Pencarian alamat (Nominatim)', 'Cari lokasi', 'Dipakai'],
     ['Sentinel-1 lewat ASF HyP3', 'Laju penurunan', p ? 'Dipakai' : 'Rencana'],
     ['GNSS CORS Pantura (Susilo dkk. 2023)', 'Titik ikat dan validasi', p?.validasi?.gnss?.length ? 'Dipakai' : 'Rencana'],
-    ['DEM Copernicus GLO-30', 'Koreksi saat olah, dan perkiraan satuan geologi', p || konteks.geologi ? 'Dipakai' : 'Rencana'],
+    ['DEM Copernicus GLO-30', geologiResmi ? 'Koreksi saat olah, dan cek batas satuan geologi' : 'Koreksi saat olah, dan perkiraan satuan geologi', p || konteks.geologi ? 'Dipakai' : 'Rencana'],
     // Baris berikut: hasil cek layanan publik pada 13 dan 14 November 2026 (lihat catatan di bawah tabel).
     ['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)', konteks.rtrw ? 'Dipakai' : 'Rencana'],
     ['RTRW Kota Semarang (GISTARU, geoportal Pemkot)', 'Pola ruang rinci', 'Tidak tersedia terbuka'],
-    ['Peta geologi PSG 1:100.000 dan Kuarter 1:50.000', 'Satuan geologi resmi', geologiResmi ? 'Dipakai' : 'Perlu akun'],
-    ['Satuan geologi dari bentuk lahan', 'Lapis geologi sementara', konteks.geologi && !geologiResmi ? 'Perkiraan' : 'Rencana'],
+    ['Peta Geologi Lembar Magelang dan Semarang 1:100.000 (PSG)', 'Lapis geologi, didigitasi tim', geologiResmi ? 'Dipakai' : 'Perlu akun'],
+    ...(geologiResmi ? [] : [['Satuan geologi dari bentuk lahan', 'Lapis geologi sementara', konteks.geologi ? 'Perkiraan' : 'Rencana'] as [string, string, StatusPil]]),
+    ['Peta Geologi Kuarter Lembar Semarang 1:50.000 (PSG)', 'Rincian endapan muda', 'Perlu akun'],
     ['Bahaya banjir dan abrasi (InaRISK BNPB)', 'Konteks rob', 'Lisensi belum jelas'],
   ]
 }
@@ -150,12 +151,15 @@ function TabelKonteks({ lapis }: { lapis: LapisKonteks }) {
   )
 }
 
-/** Kesimpulan singkat dari lapis geologi bawaan (satuan Qa dan Tb). */
+/** Kesimpulan singkat lapis geologi: Aluvium dibanding semua satuan batuan lain. */
 function ringkasGeologi(lapis: LapisKonteks): string | null {
-  const a = lapis.meta.statistik.find((s) => s.nama === 'Dataran aluvial')
-  const b = lapis.meta.statistik.find((s) => s.nama === 'Perbukitan')
-  if (a?.median == null || b?.median == null) return null
-  return `Median laju di dataran aluvial ${fmt(Math.max(0, a.median), 1)} cm/tahun dan ${fmt((a.porsiTinggi ?? 0) * 100)}% pikselnya turun minimal 4 cm/tahun. Di perbukitan median ${fmt(Math.max(0, b.median), 1)} cm/tahun, dan piksel yang turun secepat itu hanya ${fmt((b.porsiTinggi ?? 0) * 100)}%.`
+  const a = lapis.meta.statistik.find((s) => s.kode === KODE_ALUVIUM)
+  const lain = lapis.meta.statistik.filter((s) => s.kode !== KODE_ALUVIUM && s.median != null)
+  if (a?.median == null || !lain.length) return null
+  const medLain = Math.max(...lain.map((s) => s.median!))
+  const porsiLain = Math.max(...lain.map((s) => s.porsiTinggi ?? 0))
+  const persen = (v: number) => `${fmt(v * 100)}%`
+  return `Median laju di Aluvium ${fmt(Math.max(0, a.median), 1)} cm/tahun dan ${persen(a.porsiTinggi ?? 0)} pikselnya turun minimal 4 cm/tahun. Di ${lain.length === 1 ? 'satuan batuan lain' : `${lain.length} satuan batuan lainnya`}, median paling tinggi ${fmt(Math.max(0, medLain), 1)} cm/tahun dan piksel yang turun secepat itu paling banyak ${persen(porsiLain)}.`
 }
 
 function BagianKonteks({ konteks }: { konteks: Partial<Record<JenisLapis, LapisKonteks>> }) {
@@ -170,7 +174,7 @@ function BagianKonteks({ konteks }: { konteks: Partial<Record<JenisLapis, LapisK
       {!ada.length && <p className="text-ink-3">Lapis konteks belum termuat.</p>}
       {ada.map((j) => {
         const l = konteks[j]!
-        const kesimpulan = j === 'geologi' && l.meta.jenis === 'perkiraan' ? ringkasGeologi(l) : null
+        const kesimpulan = j === 'geologi' ? ringkasGeologi(l) : null
         return (
           <div key={j} className="space-y-2 border-t border-line pt-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -184,7 +188,7 @@ function BagianKonteks({ konteks }: { konteks: Partial<Record<JenisLapis, LapisK
             {l.meta.catatan && <p className="text-[13.5px]">{l.meta.catatan}</p>}
             {l.meta.aturan && <p className="text-[13.5px]">Aturan: {l.meta.aturan}</p>}
             {kesimpulan && <p className="text-[13.5px] font-semibold text-ink">{kesimpulan}</p>}
-            {j === 'geologi' && l.meta.jenis === 'perkiraan' && (
+            {j === 'geologi' && (
               <p className="text-[13.5px]">
                 Di peta terlihat ambles cepat terpusat di dataran aluvial bagian utara dan timur, sedangkan dataran aluvial di barat relatif stabil. Artinya berada di endapan aluvial tidak otomatis berarti ambles
                 cepat. Angka pengukuran di titik itu tetap yang utama.
@@ -687,8 +691,9 @@ export default function MethodView() {
           </div>
           <p className="text-[13px]">
             Sumber konteks dicek pada 13 dan 14 November 2026. RTRW Kota Semarang tidak bisa diambil: layanan GISTARU meminta token, sedangkan geoportal Pemkot dan Satu Peta BIG tidak merespons. Karena itu lapis pola
-            ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Layanan peta geologi ESDM sedang pemeliharaan, dan raster peta Pusat Survei Geologi di GeoMap hanya bisa diunduh dengan akun,
-            jadi lapis geologi sementara diperkirakan dari bentuk lahan. Layanan InaRISK BNPB bisa diakses publik, tetapi tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis genangan rob khusus.
+            ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Layanan peta geologi ESDM sedang pemeliharaan, jadi raster Peta Geologi Lembar Magelang dan Semarang diunduh tim dari
+            GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Peta Geologi Kuarter Lembar Semarang 1:50.000 yang lebih rinci belum diolah. Layanan InaRISK BNPB bisa diakses publik, tetapi tidak
+            mencantumkan lisensi pemakaian ulang dan tidak punya lapis genangan rob khusus.
           </p>
           <p className="text-[13px]">
             Elevasi tidak ditampilkan sebagai konteks. Galat DEM global beberapa meter, terlalu kasar untuk menilai rob di pesisir yang tingginya hanya satu sampai tiga meter di atas laut.

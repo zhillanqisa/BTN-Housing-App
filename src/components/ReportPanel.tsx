@@ -6,7 +6,7 @@ import { CircleNotch, DownloadSimple, LinkSimple, MapPin, Scales, X } from '@pho
 import { batasan, MAKS_BANDING, PRINSIP, TENORS } from '../lib/config'
 import { fmt, fmtKoordinat, fmtPeriode } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
-import { konteksDi, LABEL_LAPIS, statKelas, type FiturKonteks, type JenisLapis, type LapisKonteks } from '../lib/konteks'
+import { KODE_ALUVIUM, konteksDi, LABEL_LAPIS, statKelas, type FiturKonteks, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { kunciTitik, LABEL_TITIK } from '../lib/lokasi'
 import { kalimatStatus, klasifikasi, langkahBerikutnya, teksLaju } from '../lib/risk'
 import { navigasi } from '../lib/router'
@@ -49,20 +49,17 @@ function Langkah({ kategori }: { kategori: Kategori }) {
   )
 }
 
-/** Bacaan geologi terhadap angka yang terukur. Hanya untuk satuan bawaan (Qa, Tb). */
+/** Bacaan geologi terhadap angka yang terukur: Aluvium (Qa) atau satuan batuan lain. */
 function kalimatGeologi(kode: string, laju: number | null): string | null {
-  if (laju == null) return null
-  if (kode === 'Qa') {
+  if (laju == null || !kode) return null
+  if (kode === KODE_ALUVIUM) {
     return laju >= 2
       ? 'Sesuai pola umum: ambles cepat di Semarang terpusat di endapan aluvial seperti di sini.'
       : 'Endapan aluvial tidak selalu ambles cepat. Di sekitar titik ini satelit mencatat laju rendah, tetapi tetap tanyakan riwayat urukan dan jenis pondasi.'
   }
-  if (kode === 'Tb') {
-    return laju >= 2
-      ? 'Tidak biasa untuk perbukitan. Bisa karena tanah urukan atau gerakan lereng, jadi perlu dicek di lapangan.'
-      : 'Sesuai pola umum: perbukitan di Semarang hampir tidak ambles.'
-  }
-  return null
+  return laju >= 2
+    ? 'Tidak biasa untuk batuan padat seperti ini. Bisa karena tanah urukan atau gerakan lereng, jadi perlu dicek di lapangan.'
+    : 'Sesuai pola umum: batuan padat seperti ini hampir tidak ambles.'
 }
 
 function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: LapisKonteks; f: FiturKonteks; laju: number | null }) {

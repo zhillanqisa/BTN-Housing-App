@@ -13,6 +13,8 @@ export const LABEL_LAPIS: Record<JenisLapis, string> = { rtrw: 'Pola ruang RTRW'
 
 /** Laju penurunan (cm/tahun, positif = turun) di dalam satu kelas, dihitung dari grid aplikasi. */
 export interface StatKelas {
+  /** kode kelas, mis. KODKWS RTRW atau simbol satuan geologi (Qa, QTd) */
+  kode?: string
   nama: string
   warna: string
   luasKm2: number
@@ -78,6 +80,7 @@ function bacaStat(raw: unknown): StatKelas[] {
     if (!nama) return []
     return [
       {
+        kode: teks(s.kode) || undefined,
         nama,
         warna: WARNA.test(teks(s.warna)) ? teks(s.warna) : '#c4a27c',
         luasKm2: angka(s.luasKm2) ?? 0,
@@ -139,6 +142,9 @@ export function konteksDi(lapis: LapisKonteks | null | undefined, p: Position): 
 export function statKelas(lapis: LapisKonteks | null | undefined, nama: string): StatKelas | undefined {
   return lapis?.meta.statistik.find((s) => s.nama === nama)
 }
+
+/** Kode satuan Aluvium pada peta geologi (dan pada perkiraan dari bentuk lahan). */
+export const KODE_ALUVIUM = 'Qa'
 
 /** Muat satu lapis. Gagal = null, aplikasi tetap jalan tanpa lapis itu. */
 export async function ambilKonteks(lapis: JenisLapis): Promise<LapisKonteks | null> {

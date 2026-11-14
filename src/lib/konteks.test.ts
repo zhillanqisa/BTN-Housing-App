@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import geologiMentah from '../../public/data/konteks-geologi.geojson?raw'
 import rtrwMentah from '../../public/data/konteks-rtrw.geojson?raw'
-import { konteksDi, statKelas, validasiKonteks } from './konteks'
+import { KODE_ALUVIUM, konteksDi, statKelas, validasiKonteks } from './konteks'
 import type { Position } from './types'
 
 const rtrw = validasiKonteks(JSON.parse(rtrwMentah), 'rtrw')
@@ -49,16 +49,19 @@ describe('file lapis bawaan', () => {
       for (const f of l!.fitur) expect(f.warna).toMatch(/^#[0-9a-f]{6}$/i)
     }
   })
-  it('geologi: titik di dataran ambles Terboyo jatuh di dataran aluvial, Tembalang di perbukitan, laut di luar', () => {
-    expect(konteksDi(geologi, titik.terboyo!)?.nama).toBe('Dataran aluvial')
-    expect(konteksDi(geologi, titik.tembalang!)?.nama).toBe('Perbukitan')
+  it('geologi: titik di dataran ambles Terboyo jatuh di Aluvium, Tembalang di satuan batuan, laut di luar', () => {
+    expect(konteksDi(geologi, titik.terboyo!)?.kode).toBe(KODE_ALUVIUM)
+    const bukit = konteksDi(geologi, titik.tembalang!)
+    expect(bukit).not.toBeNull()
+    expect(bukit!.kode).not.toBe(KODE_ALUVIUM)
     expect(konteksDi(geologi, titik.laut!)).toBeNull()
   })
-  it('geologi: dataran aluvial turun jauh lebih cepat daripada perbukitan', () => {
-    const a = statKelas(geologi, 'Dataran aluvial')
-    const b = statKelas(geologi, 'Perbukitan')
+  it('geologi: Aluvium turun jauh lebih cepat daripada semua satuan batuan lain', () => {
+    const st = geologi!.meta.statistik
+    const a = st.find((s) => s.kode === KODE_ALUVIUM)
     expect(a?.median).toBeGreaterThan(2)
-    expect(Math.abs(b?.median ?? 99)).toBeLessThan(0.5)
+    for (const s of st.filter((x) => x.kode !== KODE_ALUVIUM && x.median != null)) expect(Math.abs(s.median!)).toBeLessThan(0.5)
+    expect(statKelas(geologi, a!.nama)).toBe(a)
   })
   it('rtrw: setiap titik di dalam kota punya kelas pola ruang dengan kode resmi', () => {
     for (const p of [titik.terboyo!, titik.tembalang!]) {

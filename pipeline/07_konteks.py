@@ -51,6 +51,8 @@ KONTEKS = KERJA / "konteks"
 SHP = REPO / "data-raw" / "konteks"
 KELUAR = REPO / "public" / "data"
 KOTAK = (110.24, -7.14, 110.53, -6.90)  # barat, selatan, timur, utara: sedikit lebih luas dari kota
+# Hasil digitasi peta geologi PSG (langkah 7a). Bila ada, dipakai menggantikan perkiraan dari DEM.
+GEOLOGI_PSG = SHP / "geologi-psg-100k.shp"
 
 URL_RTRW = (
     "https://services.arcgis.com/zmBQLV64TsFvEpV0/arcgis/rest/services/"
@@ -198,6 +200,9 @@ def olah_rtrw(sumber: Path | None, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataF
 
 
 def olah_geologi(sumber: Path | None, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]:
+    psg = sumber is None and GEOLOGI_PSG.exists()
+    if psg:
+        sumber = GEOLOGI_PSG
     if sumber:
         g = gpd.read_file(sumber)
         for k in ("KODE", "NAMA"):
@@ -207,12 +212,31 @@ def olah_geologi(sumber: Path | None, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDa
             if k not in g.columns:
                 g[k] = ""
         g = rapikan(g[["KODE", "NAMA", "BATUAN", "SIFAT", "WARNA", "geometry"]], kota, ["KODE", "NAMA", "BATUAN", "SIFAT", "WARNA"], 10)
-        meta = {
-            "judul": "Geologi permukaan (file yang diberikan)",
-            "jenis": "resmi",
-            "skala": "",
-            "sumber": [{"nama": f"File {sumber.name}", "catatan": "Diberikan lewat --geologi. Lengkapi sumber peta di README."}],
-        }
+        if psg:
+            meta = {
+                "judul": "Peta Geologi Lembar Magelang dan Semarang",
+                "jenis": "resmi",
+                "skala": "1:100.000, didigitasi tim",
+                "sumber": [
+                    {
+                        "nama": "Thanden, Sumadirdja, Richards, Sutisna dan Amin (1996), Peta Geologi Lembar Magelang dan Semarang, Jawa, skala 1:100.000, Pusat Survei Geologi",
+                        "url": "https://geologi.esdm.go.id/geomap/",
+                        "catatan": "Raster dari GeoMap Badan Geologi. Milik Pusat Survei Geologi, tidak diperjualbelikan.",
+                    }
+                ],
+                "aturan": (
+                    "Digitasi semi-otomatis: georeferensi dari empat sudut bingkai, klasifikasi warna, lalu garis kontur, sungai, jalan, "
+                    "dan huruf dibuang. Batas Aluvium hasil digitasi cocok 87% dengan kaki bukit pada DEM tanpa perlu digeser. "
+                    "Ketelitian batas sekitar 100 sampai 200 m. Jalur kota sekitar 2 km² di timur 110°30' BT berada di luar lembar dan diisi satuan dari tepi lembar."
+                ),
+            }
+        else:
+            meta = {
+                "judul": "Geologi permukaan (file yang diberikan)",
+                "jenis": "resmi",
+                "skala": "",
+                "sumber": [{"nama": f"File {sumber.name}", "catatan": "Diberikan lewat --geologi. Lengkapi sumber peta di README."}],
+            }
         return g, meta
 
     with rasterio.open(unduh_dem()) as s:
@@ -264,7 +288,7 @@ def baca_grid() -> tuple[dict, np.ndarray]:
     return kepala, laju
 
 
-def statistik(g: gpd.GeoDataFrame, kolom: str) -> list[dict]:
+def statistik(g: gpd.GeoDataFrame, kolom: str, kolom_kode: str) -> list[dict]:
     """Laju penurunan per kelas, dari grid aplikasi (piksel yang sama dengan yang dilihat pengguna)."""
     kepala, laju = baca_grid()
     barat, _, _, utara = kepala["bbox"]
@@ -281,6 +305,7 @@ def statistik(g: gpd.GeoDataFrame, kolom: str) -> list[dict]:
         nilai = laju[m & terukur] * kepala["skalaLaju"]
         n_dalam = int((m & dalam).sum())
         item = {
+            "kode": str(baris[kolom_kode]),
             "nama": baris[kolom],
             "warna": baris["WARNA"],
             "luasKm2": round(float(luas.iloc[i]), 1),
@@ -337,16 +362,22 @@ def main() -> None:
         if not a.rtrw
         else ""
     )
-    tulis(rtrw, "rtrw-pola-ruang", "rtrw", meta_rtrw, {"kode": "KODKWS", "nama": "NAMOBJ", "fungsi": "FUNGSI", "warna": "WARNA"}, statistik(rtrw, "NAMOBJ"))
+    tulis(rtrw, "rtrw-pola-ruang", "rtrw", meta_rtrw, {"kode": "KODKWS", "nama": "NAMOBJ", "fungsi": "FUNGSI", "warna": "WARNA"}, statistik(rtrw, "NAMOBJ", "KODKWS"))
 
     geo, meta_geo = olah_geologi(a.geologi, kota)
-    meta_geo["catatan"] = (
-        "Batas satuan diperkirakan dari bentuk lahan, bukan dari peta geologi. Akan diganti hasil digitasi Peta Geologi Lembar Magelang dan Semarang "
-        "serta Peta Geologi Kuarter Lembar Semarang (Pusat Survei Geologi) setelah rasternya diperoleh."
-        if not a.geologi
-        else ""
-    )
-    tulis(geo, "geologi-permukaan", "geologi", meta_geo, {"kode": "KODE", "nama": "NAMA", "batuan": "BATUAN", "sifat": "SIFAT", "warna": "WARNA"}, statistik(geo, "NAMA"))
+    if a.geologi:
+        meta_geo["catatan"] = ""
+    elif meta_geo["jenis"] == "perkiraan":
+        meta_geo["catatan"] = (
+            "Batas satuan diperkirakan dari bentuk lahan, bukan dari peta geologi. Jalankan 07a_digitasi_geologi.py dengan raster peta PSG "
+            "untuk menggantinya."
+        )
+    else:
+        meta_geo["catatan"] = (
+            "Peta skala 1:100.000 menggambarkan satuan batuan di permukaan, bukan kondisi tanah di bawah satu persil. "
+            "Ketebalan endapan lunak di bawah rumah tetap perlu diketahui dari penyelidikan tanah (sondir atau boring)."
+        )
+    tulis(geo, "geologi-permukaan", "geologi", meta_geo, {"kode": "KODE", "nama": "NAMA", "batuan": "BATUAN", "sifat": "SIFAT", "warna": "WARNA"}, statistik(geo, "NAMA", "KODE"))
 
 
 if __name__ == "__main__":

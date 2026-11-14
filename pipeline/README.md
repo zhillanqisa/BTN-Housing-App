@@ -16,7 +16,8 @@ Semua langkah sudah dijalankan penuh pada 14 November 2026.
 | 4. Deret waktu MintPy per lintasan | `04_mintpy.py` | 170 tanggal descending, 259 ascending |
 | 5. Gerak vertikal dan validasi | `05_vertikal_validasi.py` | Gerbang mutu lulus |
 | 6. Ekspor grid dan ringkasan kelurahan | `06_ekspor.py` | 49.830 piksel terukur, 177 kelurahan |
-| 7. Lapis konteks: pola ruang dan geologi | `07_konteks.py` | 9 kelas pola ruang, 2 satuan geologi, statistik laju per kelas |
+| 7a. Digitasi peta geologi PSG | `07a_digitasi_geologi.py` | 7 satuan batuan di dalam kota |
+| 7. Lapis konteks: pola ruang dan geologi | `07_konteks.py` | 9 kelas pola ruang, 7 satuan geologi, statistik laju per kelas |
 
 `status_hyp3.py` menampilkan status job di HyP3 dan sisa kredit.
 
@@ -56,17 +57,17 @@ Sumber dicek 14 November 2026:
 |---|---|---|
 | RTRW Kota Semarang | GISTARU, geoportal Pemkot (`geoportal.data.semarangkota.go.id`), Satu Peta BIG, katalog Tanah Air Indonesia | GISTARU meminta token; yang lain tidak merespons atau menolak (403) |
 | RTRW Provinsi Jawa Tengah 2024-2044 | Layanan ArcGIS publik "Peta Rencana Perda Jawa Tengah No 8 Tahun 2024" | Terbuka. Dipakai, skala provinsi |
-| Peta geologi PSG | Layanan peta geologi ESDM, GeoMap Badan Geologi | ESDM sedang pemeliharaan. GeoMap hanya memberi raster setelah masuk akun; lisensinya terbuka dengan menyebut sumber PSG |
-| DEM Copernicus GLO-30 | AWS Open Data | Terbuka. Dipakai untuk perkiraan satuan geologi |
+| Peta geologi PSG | Layanan peta geologi ESDM, GeoMap Badan Geologi | ESDM sedang pemeliharaan. Raster Lembar Magelang dan Semarang 1:100.000 diunduh tim lewat akun GeoMap; lisensinya terbuka dengan menyebut sumber PSG, tidak untuk diperjualbelikan |
+| DEM Copernicus GLO-30 | AWS Open Data | Terbuka. Dipakai untuk memeriksa letak batas Aluvium hasil digitasi |
 
-Geologi sementara diperkirakan dari bentuk lahan: dataran aluvial adalah piksel dengan lereng rata-rata paling besar 2 derajat, tinggi paling besar 50 m, dan tersambung ke pantai. Ambang ini dipilih setelah membandingkan beberapa kombinasi; batasnya stabil di kaki bukit.
+Digitasi geologi (`07a_digitasi_geologi.py`, raster di `<PA_OLAH>/konteks/mentah/`): georeferensi dari empat sudut bingkai, klasifikasi warna CIELAB dengan warna acuan dari pengelompokan k-means, lalu garis kontur, sungai, jalan, dan huruf dibuang dan celah diisi satuan terdekat. Dua aturan dari membaca peta: satuan gunungapi Gajahmungkur dan Jongkong hanya di selatan kota, dan Formasi Kerek hanya di lajur tengah berarsir, tenggara, dan tepi barat. Batas Aluvium hasil digitasi cocok 87% dengan dataran rendah pada DEM, dan menggeser peta tidak memperbaiki kecocokan, jadi tidak ada koreksi datum. Bila raster tidak ada, `07_konteks.py` kembali ke perkiraan dari bentuk lahan pada DEM.
 
 Hasil statistik (laju median dari grid aplikasi):
 
 | Kelas | Median (cm/tahun) | Piksel ≥ 4 cm/tahun |
 |---|---|---|
-| Dataran aluvial | 4,9 | 55% |
-| Perbukitan | -0,1 | 0% |
+| Aluvium | 3,6 | 48% |
+| Enam satuan batuan lain | -0,1 sampai 0,0 | 0% |
 | Pola ruang: Kawasan Transportasi | 6,7 | 58% |
 | Pola ruang: Kawasan Permukiman | 0,0 | 18% |
 
@@ -106,6 +107,7 @@ python pipeline/04_mintpy.py --lintasan desc
 python pipeline/04_mintpy.py --lintasan asc
 python pipeline/05_vertikal_validasi.py
 python pipeline/06_ekspor.py
+python pipeline/07a_digitasi_geologi.py
 python pipeline/07_konteks.py
 ```
 

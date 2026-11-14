@@ -137,15 +137,15 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 `konteks-rtrw.geojson` dan `konteks-geologi.geojson`, ditulis oleh `pipeline/07_konteks.py`. Satu fitur = satu kelas.
 
 - Properti fitur: `kode`, `nama`, `warna` (hex). RTRW menambah `fungsi` (Lindung atau Budi daya). Geologi menambah `batuan` dan `sifat`.
-- `metadata`: `judul`, `jenis` (`resmi` atau `perkiraan`), `skala`, `sumber`, `catatan`, `aturan` (geologi perkiraan), dan `statistik`: per kelas `luasKm2`, `nPiksel`, `cakupan`, `median`, `p75`, `porsiTinggi` (bagian piksel yang turun minimal 4 cm/tahun).
+- `metadata`: `judul`, `jenis` (`resmi` atau `perkiraan`), `skala`, `sumber`, `catatan`, `aturan` (cara digitasi atau perkiraan), dan `statistik`: per kelas `kode`, `nama`, `luasKm2`, `nPiksel`, `cakupan`, `median`, `p75`, `porsiTinggi` (bagian piksel yang turun minimal 4 cm/tahun).
 - Lapis konteks tidak mengubah kategori. Bila file tidak ada, aplikasi tetap jalan tanpa pilihan lapis itu.
 
 | Lapis | Sumber saat ini | Catatan |
 |---|---|---|
 | Pola ruang | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000. RTRW Kota Semarang yang rinci tidak bisa diambil pada 14 November 2026 |
-| Geologi | Perkiraan dari bentuk lahan pada DEM Copernicus GLO-30: dataran rendah datar yang tersambung ke pantai dianggap endapan aluvial | Bukan peta geologi resmi. Peta Pusat Survei Geologi hanya bisa diunduh dengan akun GeoMap |
+| Geologi | Peta Geologi Lembar Magelang dan Semarang 1:100.000 (Thanden dkk. 1996, Pusat Survei Geologi), raster dari GeoMap didigitasi tim dengan `pipeline/07a_digitasi_geologi.py` | 7 satuan di dalam kota. Batas Aluvium cocok 87% dengan kaki bukit pada DEM tanpa digeser. Ketelitian batas sekitar 100 sampai 200 m |
 
-Hasil analisis awal: median laju di dataran aluvial 4,9 cm/tahun (55% pikselnya turun minimal 4 cm/tahun), di perbukitan 0,0. Ambles cepat terpusat di aluvial bagian utara dan timur; aluvial di barat relatif stabil.
+Hasil analisis: median laju di Aluvium 3,6 cm/tahun dan 48% pikselnya turun minimal 4 cm/tahun. Di keenam satuan batuan lain (Formasi Damar, Kaligetas, Kerek, Kalibeng, Jongkong, dan batuan gunungapi Gajahmungkur) median sekitar 0 dan tidak ada piksel yang turun secepat itu. Di dalam Aluvium pun ambles cepat terpusat di bagian utara dan timur; Aluvium di barat relatif stabil.
 
 Untuk mengganti dengan data resmi: `python pipeline/07_konteks.py --rtrw rtrw_kota.shp` (kolom `NAMOBJ`, `KODKWS`) atau `--geologi geologi.shp` (kolom `KODE`, `NAMA`, `BATUAN`, `SIFAT`, `WARNA`).
 
@@ -190,7 +190,7 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 - Belum ada pembanding lapangan di kawasan yang ambles. Stasiun GNSS terbuka satu-satunya di kota (CSEM) berada di area stabil dan dipakai sebagai titik ikat. Bila tim memperoleh data sipat datar atau GNSS di Semarang bawah, bandingkan dengan laporan titik di lokasi itu.
 - 18% piksel kota tidak terukur, terutama tambak dan pesisir Tugu serta lereng bervegetasi di Mijen dan Gunungpati. Di sana aplikasi menulis "data tidak memadai".
 - Lapis pola ruang memakai RTRW Provinsi (skala 1:250.000), terlalu kasar untuk memastikan peruntukan satu persil. RTRW Kota Semarang perlu diminta ke Dinas Penataan Ruang atau diakses lewat GISTARU dengan token.
-- Lapis geologi masih perkiraan dari bentuk lahan. Perlu digitasi Peta Geologi Lembar Magelang dan Semarang 1:100.000 serta Peta Geologi Kuarter Lembar Semarang 1:50.000 dari GeoMap (perlu akun).
+- Lapis geologi berskala 1:100.000 dan menggambarkan batuan di permukaan, bukan tebal endapan lunak di bawah satu persil. Peta Geologi Kuarter Lembar Semarang 1:50.000 yang lebih rinci untuk endapan muda belum didigitasi.
 - Lapis rob tidak dipakai: InaRISK BNPB tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis rob khusus. Elevasi dari DEM global juga tidak ditampilkan karena galatnya beberapa meter.
 - Data berhenti di November 2026. Pembaruan berarti menjalankan ulang pipeline; belum otomatis.
 - Nominatim: maksimal 1 permintaan per detik dan tanpa autocomplete. Karena itu pencarian alamat hanya dikirim saat tombol Cari ditekan. Untuk pemakaian ramai, siapkan layanan geocoding sendiri.
@@ -203,7 +203,7 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 - Titik ikat GNSS: Susilo dkk. (2023), Zenodo `10.5281/zenodo.7775016`, CC BY 4.0.
 - Pola ruang: RTRW Provinsi Jawa Tengah 2024-2044 (Perda Provinsi Jawa Tengah Nomor 8 Tahun 2024).
 - DEM: Copernicus GLO-30, © DLR e.V. 2010-2014 dan © Airbus Defence and Space GmbH 2014-2018, disediakan di bawah program Copernicus.
-- Nama satuan batuan: Thanden dkk. (1996), Peta Geologi Lembar Magelang dan Semarang, Pusat Survei Geologi.
+- Geologi: Thanden, Sumadirdja, Richards, Sutisna dan Amin (1996), Peta Geologi Lembar Magelang dan Semarang, Jawa, 1:100.000, Pusat Survei Geologi (GeoMap Badan Geologi). Milik PSG, tidak diperjualbelikan. Raster tidak disimpan di repo.
 - Batas wilayah: © OpenStreetMap contributors (ODbL).
 - Peta dasar: OpenFreeMap, © OpenMapTiles, data OpenStreetMap.
 - Pencarian alamat: Nominatim, [kebijakan pemakaian](https://operations.osmfoundation.org/policies/nominatim/).
