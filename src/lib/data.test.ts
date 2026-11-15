@@ -213,6 +213,31 @@ describe('PDF Laporan Ambles', () => {
     expect(teks).toContain('Tanyakan ke penjual'.toUpperCase())
     expect(teks).toContain('bhumi.atrbpn.go.id')
   })
+  it('zona RDTR tampil dengan sub-zona dan zonanya, dan tiga lapis tetap muat paling banyak tiga halaman', async () => {
+    const k = kawasan.find((x) => x.nama === 'Kaligawe')!
+    const rdtr: KonteksPdf = {
+      jenis: 'rdtr',
+      sumber: 'Rencana pola ruang RDTR Kota Pekalongan 2024-2044, skala 1:5.000',
+      kode: '32103000',
+      nama: 'Perumahan Kepadatan Tinggi',
+      zona: 'Perumahan',
+      fungsi: 'Budi daya',
+      warna: '#f2c14e',
+      peta: [{ nama: 'Perumahan', warna: '#f2c14e', cincin: [kotak(k.pusat, -0.004, -0.004, 0.004, 0.004)] }],
+    }
+    const kategori = klasifikasi(k.laju, k.memadai, { sedang: 2, tinggi: 4 })
+    const blob = await buatLaporanPdf({
+      kawasan: k, kategori, tenor: 15, thresholds: { sedang: 2, tinggi: 4 }, meta: asli.dataset.metadata, label: 'Kaligawe', lngLat: k.pusat, gambarPeta: null,
+      konteks: [rdtr, ...konteksDi(k.pusat)],
+    })
+    const teks = new TextDecoder('latin1').decode(await blob.arrayBuffer())
+    expect(teks).toContain('ZONA RDTR')
+    expect(teks).toContain('POLA RUANG RTRW')
+    expect(teks).toContain('zona Perumahan')
+    // penjelasan sub-zona (teks bisa terbungkus antarbaris, jadi cek satu kata)
+    expect(teks).toContain('Kepadatan')
+    expect(teks).toMatch(/\/Count [23]\b/)
+  })
   it('laporan titik menyebut blok di sekitar titik, bukan kawasan', async () => {
     const k = kawasan.find((x) => x.nama === 'Kaligawe')!
     const blob = await buatLaporanPdf({

@@ -1,14 +1,20 @@
-// Lapis konteks di atas peta laju: pola ruang RTRW dan geologi permukaan.
-// File ditulis oleh pipeline/07_konteks.py. Kedua lapis memakai skema yang sama:
+// Lapis konteks di atas peta laju: zona RDTR, pola ruang RTRW, dan geologi permukaan.
+// File ditulis oleh pipeline/07_konteks.py. Ketiga lapis memakai skema yang sama:
 // GeoJSON FeatureCollection, properti kode/nama/warna per fitur, dan metadata berisi
-// sumber, catatan, serta statistik laju penurunan per kelas.
+// sumber, catatan, serta statistik laju penurunan per kelas (per zona untuk RDTR dan RTRW).
 import { bboxOf, inBBox, pointInGeometry } from './geo'
 import type { BBox, KawasanGeometry, Position, SumberData } from './types'
 
-export type JenisLapis = 'rtrw' | 'geologi'
-export const JENIS_LAPIS: JenisLapis[] = ['rtrw', 'geologi']
+export type JenisLapis = 'rdtr' | 'rtrw' | 'geologi'
+/** Urutan tampil: RDTR paling rinci dan paling menentukan izin bangunan, jadi didahulukan. */
+export const JENIS_LAPIS: JenisLapis[] = ['rdtr', 'rtrw', 'geologi']
 
-export const LABEL_LAPIS: Record<JenisLapis, string> = { rtrw: 'Pola ruang RTRW', geologi: 'Geologi permukaan' }
+export const LABEL_LAPIS: Record<JenisLapis, string> = { rdtr: 'Zona RDTR', rtrw: 'Pola ruang RTRW', geologi: 'Geologi permukaan' }
+/** Label pendek untuk tombol pilihan lapis. */
+export const LABEL_SINGKAT: Record<JenisLapis, string> = { rdtr: 'RDTR', rtrw: 'RTRW', geologi: 'Geologi' }
+
+/** Lapis rencana tata ruang (bukan geologi). */
+export const lapisTataRuang = (j: JenisLapis): j is 'rdtr' | 'rtrw' => j !== 'geologi'
 
 /** Laju penurunan (cm/tahun, positif = turun) di dalam satu kelas, dihitung dari grid aplikasi. */
 export interface StatKelas {
@@ -43,9 +49,12 @@ export interface MetaKonteks {
 
 export interface FiturKonteks {
   kode: string
+  /** RDTR dan RTRW Kota: nama sub-zona, mis. "Perumahan Kepadatan Tinggi" */
   nama: string
   warna: string
-  /** RTRW: Lindung atau Budi daya */
+  /** RDTR dan RTRW: zona tempat sub-zona ini berada, mis. "Perumahan". Statistik dan legenda per zona. */
+  zona?: string
+  /** RDTR dan RTRW: Lindung atau Budi daya */
   fungsi?: string
   /** Geologi: jenis batuan */
   batuan?: string
@@ -107,6 +116,7 @@ export function validasiKonteks(raw: unknown, lapis: JenisLapis): LapisKonteks |
         kode: teks(p.kode),
         nama,
         warna: WARNA.test(teks(p.warna)) ? teks(p.warna) : '#c4a27c',
+        zona: teks(p.zona).trim() || undefined,
         fungsi: teks(p.fungsi) || undefined,
         batuan: teks(p.batuan) || undefined,
         sifat: teks(p.sifat) || undefined,
@@ -140,6 +150,16 @@ export function konteksDi(lapis: LapisKonteks | null | undefined, p: Position): 
 
 export function statKelas(lapis: LapisKonteks | null | undefined, nama: string): StatKelas | undefined {
   return lapis?.meta.statistik.find((s) => s.nama === nama)
+}
+
+/** Statistik kelas sebuah fitur: per zona bila fitur punya zona (RDTR, RTRW Kota), selain itu per nama. */
+export function statFitur(lapis: LapisKonteks | null | undefined, f: FiturKonteks): StatKelas | undefined {
+  return statKelas(lapis, f.zona ?? f.nama) ?? statKelas(lapis, f.nama)
+}
+
+/** Nama kelas untuk tampilan singkat: "Zona: sub-zona" bila keduanya beda. */
+export function namaKelas(f: FiturKonteks): string {
+  return f.zona && f.zona !== f.nama ? `${f.zona}: ${f.nama}` : f.nama
 }
 
 /** Kode satuan Aluvium pada peta geologi (dan pada perkiraan dari bentuk lahan). */

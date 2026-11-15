@@ -1,12 +1,17 @@
 // Tes lapis konteks: validasi file, pencarian kelas di titik, dan statistik.
 import { describe, expect, it } from 'vitest'
+import rdtrMentah from '../../public/data/pekalongan-konteks-rdtr.geojson?raw'
 import geologiMentah from '../../public/data/semarang-konteks-geologi.geojson?raw'
 import rtrwMentah from '../../public/data/semarang-konteks-rtrw.geojson?raw'
-import { KODE_ALUVIUM, konteksDi, statKelas, validasiKonteks } from './konteks'
+import { KODE_ALUVIUM, konteksDi, statFitur, statKelas, validasiKonteks, type LapisKonteks } from './konteks'
+import { penjelasanPolaRuang, penjelasanSubzona } from './penjelasan'
 import type { Position } from './types'
 
 const rtrw = validasiKonteks(JSON.parse(rtrwMentah), 'rtrw')
+const rdtr = validasiKonteks(JSON.parse(rdtrMentah), 'rdtr')
 const geologi = validasiKonteks(JSON.parse(geologiMentah), 'geologi')
+
+const zonaDi = (l: LapisKonteks) => new Set(l.fitur.map((f) => f.zona ?? f.nama))
 
 describe('validasiKonteks', () => {
   it('menolak yang bukan FeatureCollection atau tanpa fitur sah', () => {
@@ -41,13 +46,35 @@ describe('file lapis bawaan', () => {
     tembalang: [110.44, -7.05],
     laut: [110.4, -6.9],
   }
-  it('kedua lapis termuat, dengan sumber dan statistik', () => {
-    for (const l of [rtrw, geologi]) {
+  it('ketiga lapis termuat, dengan sumber dan statistik per zona (tata ruang) atau per satuan (geologi)', () => {
+    for (const l of [rdtr, rtrw, geologi]) {
       expect(l).not.toBeNull()
       expect(l!.meta.sumber.length).toBeGreaterThan(0)
-      expect(l!.meta.statistik.length).toBe(l!.fitur.length)
-      for (const f of l!.fitur) expect(f.warna).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(l!.meta.statistik.length).toBe(zonaDi(l!).size)
+      for (const f of l!.fitur) {
+        expect(f.warna).toMatch(/^#[0-9a-f]{6}$/i)
+        expect(statFitur(l, f)).toBeDefined()
+      }
     }
+  })
+  it('tata ruang: setiap zona punya penjelasan untuk calon pembeli rumah', () => {
+    for (const l of [rdtr, rtrw]) {
+      for (const z of zonaDi(l!)) {
+        const kode = l!.fitur.find((f) => (f.zona ?? f.nama) === z)!.kode
+        expect(penjelasanPolaRuang(kode, z), z).not.toBeNull()
+      }
+    }
+  })
+  it('rdtr Pekalongan: titik di pusat kota jatuh di sub-zona dengan zona, kode resmi, dan fungsi', () => {
+    const f = konteksDi(rdtr, [109.6745, -6.8895])
+    expect(f).not.toBeNull()
+    expect(f!.zona).toBeTruthy()
+    expect(f!.kode).toMatch(/^3[12]\d{6}$/)
+    expect(['Lindung', 'Budi daya']).toContain(f!.fungsi)
+    expect(penjelasanPolaRuang('32103000', 'Perumahan')?.hunian).toBe('sesuai')
+    expect(penjelasanSubzona('Perumahan Kepadatan Tinggi')).toMatch(/kavling kecil/)
+    expect(penjelasanSubzona('SPU Skala Kelurahan')).toMatch(/kelurahan/)
+    expect(penjelasanSubzona('Badan Air')).toBeNull()
   })
   it('geologi: titik di dataran ambles Terboyo jatuh di Aluvium, Tembalang di satuan batuan, laut di luar', () => {
     expect(konteksDi(geologi, titik.terboyo!)?.kode).toBe(KODE_ALUVIUM)

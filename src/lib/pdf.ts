@@ -6,7 +6,7 @@ import { APP, batasan, LABEL_KATEGORI, TENORS, WARNA_KATEGORI } from './config'
 import { unduhBerkas } from './data'
 import { fmt, fmtKoordinat, fmtPeriode, fmtTanggal, slug } from './format'
 import { CATATAN_PENAMPANG, LANGKAH_PERSIL, penampang as susunPenampang, RADIUS_PETA_MINI_M, SKALA_DAYA, SKALA_HUNIAN, type Penampang } from './penampang'
-import { BHUMI, penjelasanGeologi, penjelasanPolaRuang, PERSIL_CATATAN, PERSIL_RINGKAS } from './penjelasan'
+import { BHUMI, penjelasanGeologi, penjelasanPolaRuang, penjelasanSubzona, PERSIL_CATATAN, PERSIL_RINGKAS } from './penjelasan'
 import { hitungProyeksi, kalimatProyeksi, kalimatStatus, langkahBerikutnya, teksLaju, teksProyeksi } from './risk'
 import type { DatasetMeta, Kategori, Kawasan, Position, Tenor, Thresholds } from './types'
 
@@ -27,11 +27,13 @@ export interface DataLaporanPdf {
 }
 
 export interface KonteksPdf {
-  jenis: 'rtrw' | 'geologi'
+  jenis: 'rdtr' | 'rtrw' | 'geologi'
   /** Judul dan skala sumber, mis. "Peta Geologi Lembar Jakarta, 1:100.000". */
   sumber: string
   kode: string
   nama: string
+  /** RDTR dan RTRW Kota: zona tempat sub-zona `nama` berada. */
+  zona?: string
   fungsi?: string
   batuan?: string
   sifat?: string
@@ -647,20 +649,27 @@ function halamanKonteks(doc: JsPdf, a: ReturnType<typeof alat>, d: DataLaporanPd
   for (const kx of d.konteks ?? []) {
     pastikan(80)
     const yAwal = y
-    a.judul(kx.jenis === 'rtrw' ? 'POLA RUANG' : 'GEOLOGI PERMUKAAN', y)
+    a.judul(kx.jenis === 'rdtr' ? 'ZONA RDTR' : kx.jenis === 'rtrw' ? 'POLA RUANG RTRW' : 'GEOLOGI PERMUKAAN', y)
+    const beda = !!kx.zona && kx.zona !== kx.nama
     a.teks(kx.jenis === 'geologi' && kx.kode ? `${kx.nama}  (${kx.kode})` : kx.nama, M, y + 6, { ukuran: 12.5, tebal: true })
+    if (beda) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12.5)
+      a.teks(`zona ${kx.zona}`, M + doc.getTextWidth(kx.nama) + 3, y + 6, { ukuran: 8.5, warna: ABU })
+    }
     y += 10.5
     const yBaris = y
-    // kolom kiri: peta mini
-    const yKiri = kx.peta?.length ? gambarPetaMini(doc, a, M, yBaris, PETA, d.lngLat, kx.peta, kx.nama) : yBaris
+    // kolom kiri: peta mini (legenda per zona)
+    const yKiri = kx.peta?.length ? gambarPetaMini(doc, a, M, yBaris, PETA, d.lngLat, kx.peta, kx.zona ?? kx.nama) : yBaris
     // kolom kanan: skala dan visual utama
     let yKn = yBaris + 2.5
-    if (kx.jenis === 'rtrw') {
-      const pr = penjelasanPolaRuang(kx.kode, kx.nama)
+    if (kx.jenis !== 'geologi') {
+      const pr = penjelasanPolaRuang(kx.kode, kx.zona ?? kx.nama)
+      const subzona = penjelasanSubzona(kx.nama)
       if (pr) {
         yKn = gambarStrip(doc, a, xKanan, yKn, wKanan, 'Status untuk rumah tinggal', SKALA_HUNIAN, pr.hunian, pr.hunian === 'tidak') + 2
         y = yKn
-        sub('Artinya', pr.arti, xKanan, wKanan)
+        sub('Artinya', subzona ? `${pr.arti} ${subzona}` : pr.arti, xKanan, wKanan)
         sub('Untuk membeli rumah', pr.untukRumah, xKanan, wKanan)
         if (pr.catatan) sub('Kaitan dengan ambles', pr.catatan, xKanan, wKanan)
         yKn = y
@@ -681,7 +690,9 @@ function halamanKonteks(doc: JsPdf, a: ReturnType<typeof alat>, d: DataLaporanPd
       }
     }
     if (y < yAwal) y = yAwal
-    sumberKonteks.push(`${kx.jenis === 'rtrw' ? 'pola ruang (rencana peruntukan, bukan guna lahan saat ini)' : 'geologi'}: ${kx.sumber}`)
+    const jenisSumber =
+      kx.jenis === 'rdtr' ? 'zona RDTR (rencana, bukan guna lahan saat ini)' : kx.jenis === 'rtrw' ? 'pola ruang RTRW (rencana peruntukan, bukan guna lahan saat ini)' : 'geologi'
+    sumberKonteks.push(`${jenisSumber}: ${kx.sumber}`)
     garisPemisah()
   }
 

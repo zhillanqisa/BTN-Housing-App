@@ -7,11 +7,11 @@ import { ArrowSquareOut, Check, CircleNotch, DownloadSimple, LinkSimple, MapPin,
 import { batasan, MAKS_BANDING, PRINSIP, TENORS } from '../lib/config'
 import { fmt, fmtKoordinat, fmtPeriode } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
-import { KODE_ALUVIUM, konteksDi, LABEL_LAPIS, statKelas, type FiturKonteks, type JenisLapis, type LapisKonteks } from '../lib/konteks'
+import { JENIS_LAPIS, KODE_ALUVIUM, konteksDi, LABEL_LAPIS, lapisTataRuang, statFitur, type FiturKonteks, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { kunciTitik, LABEL_TITIK } from '../lib/lokasi'
 import { polygonsOf } from '../lib/geo'
 import { LANGKAH_PERSIL, penampang, RADIUS_PETA_MINI_M, SKALA_DAYA, SKALA_HUNIAN } from '../lib/penampang'
-import { BHUMI, penjelasanGeologi, penjelasanPolaRuang, PERSIL_CATATAN, PERSIL_RINGKAS } from '../lib/penjelasan'
+import { BHUMI, penjelasanGeologi, penjelasanPolaRuang, penjelasanSubzona, PERSIL_CATATAN, PERSIL_RINGKAS } from '../lib/penjelasan'
 import { kalimatStatus, klasifikasi, langkahBerikutnya, teksLaju } from '../lib/risk'
 import { navigasi } from '../lib/router'
 import { jembatanPeta, useApp, useBacaan } from '../lib/store'
@@ -63,7 +63,7 @@ export function useLaporan() {
     try {
       const { unduhLaporanPdf } = await import('../lib/pdf')
       const lajuTerukur = k.memadai && k.laju != null ? k.laju : null
-      const konteksPdf = (['rtrw', 'geologi'] as const).flatMap((j) => {
+      const konteksPdf = JENIS_LAPIS.flatMap((j) => {
         const lapis = konteks[j]
         const f = konteksDi(lapis, selection.lngLat)
         if (!lapis || !f) return []
@@ -76,13 +76,15 @@ export function useLaporan() {
         const peta = lapis.fitur
           .filter((ft) => ft.bbox[0] <= lon + dLon && ft.bbox[2] >= lon - dLon && ft.bbox[1] <= lat + dLat && ft.bbox[3] >= lat - dLat)
           .sort((p, q) => luas(q.bbox) - luas(p.bbox))
-          .map((ft) => ({ nama: ft.nama, warna: ft.warna, cincin: polygonsOf(ft.geometry).map((pg) => pg[0]!) }))
+          // RDTR: legenda peta mini per zona, bukan per sub-zona
+          .map((ft) => ({ nama: ft.zona ?? ft.nama, warna: ft.warna, cincin: polygonsOf(ft.geometry).map((pg) => pg[0]!) }))
         return [
           {
             jenis: j,
             sumber,
             kode: f.kode,
             nama: f.nama,
+            zona: f.zona,
             fungsi: f.fungsi,
             batuan: f.batuan,
             sifat: f.sifat,
@@ -216,11 +218,19 @@ function Rincian({ judul, children }: { judul: string; children: ReactNode }) {
 function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: LapisKonteks; f: FiturKonteks; laju: number | null }) {
   const lapisKonteks = useApp((s) => s.lapisKonteks)
   const setLapisKonteks = useApp((s) => s.setLapisKonteks)
-  const st = statKelas(lapis, f.nama)
+  const st = statFitur(lapis, f)
   const tampil = lapisKonteks === jenis
   const bacaan = jenis === 'geologi' ? kalimatGeologi(f.kode, laju) : null
-  const pr = jenis === 'rtrw' ? penjelasanPolaRuang(f.kode, f.nama) : null
+  const ruang = lapisTataRuang(jenis)
+  const pr = ruang ? penjelasanPolaRuang(f.kode, f.zona ?? f.nama) : null
+  const subzona = ruang ? penjelasanSubzona(f.nama) : null
   const geo = jenis === 'geologi' ? penjelasanGeologi(f.kode) : null
+  const beda = !!f.zona && f.zona !== f.nama
+  const keterangan = ruang
+    ? [beda ? `Zona ${f.zona}` : null, f.fungsi ?? (pr ? `Kawasan ${pr.golongan.toLowerCase()}` : null)].filter(Boolean).join(' · ')
+    : geo
+      ? geo.umur.split(',')[0]
+      : ''
   return (
     <div className="rounded-[14px] bg-surface-2 p-3">
       <div className="flex items-center justify-between gap-2">
@@ -234,10 +244,10 @@ function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: Lap
           {tampil ? 'Sembunyikan di peta' : 'Tampilkan di peta'}
         </button>
       </div>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <span aria-hidden="true" className="size-3.5 shrink-0 rounded-[4px] ring-1 ring-black/10" style={{ background: f.warna }} />
         <span className="text-[14px] font-bold text-ink">{f.nama}</span>
-        <span className="text-[12px] text-ink-3">{f.fungsi ?? (pr ? `Kawasan ${pr.golongan.toLowerCase()}` : geo ? geo.umur.split(',')[0] : '')}</span>
+        <span className="text-[12px] text-ink-3">{keterangan}</span>
       </div>
 
       {pr && <StripSkala judul="Status untuk rumah tinggal" opsi={SKALA_HUNIAN} aktif={pr.hunian} waspada={pr.hunian === 'tidak'} />}
@@ -252,7 +262,10 @@ function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: Lap
       {bacaan && <p className="mt-1 text-[12.5px] font-semibold leading-snug text-ink">{bacaan}</p>}
       {pr && (
         <>
-          <Rincian judul="Artinya">{pr.arti}</Rincian>
+          <Rincian judul="Artinya">
+            {pr.arti}
+            {subzona && ` ${subzona}`}
+          </Rincian>
           <Rincian judul="Untuk membeli rumah">{pr.untukRumah}</Rincian>
           {pr.catatan && <Rincian judul="Kaitan dengan ambles">{pr.catatan}</Rincian>}
         </>
@@ -274,17 +287,18 @@ function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: Lap
         </>
       )}
       <p className="mt-2.5 text-[11.5px] leading-snug text-ink-3">
-        {st?.median != null && `Median laju kelas ini di seluruh wilayah ${fmt(Math.max(0, st.median), 1)} cm/tahun dari ${fmt(st.nPiksel)} piksel. `}
+        {st?.median != null &&
+          `Median laju ${beda ? `zona ${f.zona}` : 'kelas ini'} di seluruh wilayah ${fmt(Math.max(0, st.median), 1)} cm/tahun dari ${fmt(st.nPiksel)} piksel. `}
         {lapis.meta.jenis === 'perkiraan' ? 'Batasnya perkiraan dari bentuk lahan, bukan peta geologi resmi.' : `${lapis.meta.judul}${lapis.meta.skala ? `, skala ${lapis.meta.skala}` : ''}.`}
       </p>
     </div>
   )
 }
 
-/** Pola ruang dan geologi yang memuat titik. Kosong bila tidak ada lapis yang memuatnya. */
+/** Zona RDTR, pola ruang RTRW, dan geologi yang memuat titik. Kosong bila tidak ada lapis yang memuatnya. */
 export function useBarisKonteks(lngLat: Position) {
   const konteks = useApp((s) => s.konteks)
-  return (['rtrw', 'geologi'] as const).flatMap((j) => {
+  return JENIS_LAPIS.flatMap((j) => {
     const lapis = konteks[j]
     const f = konteksDi(lapis, lngLat)
     return lapis && f ? [{ j, lapis, f }] : []

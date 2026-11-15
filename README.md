@@ -6,7 +6,7 @@
 
 Laporan mengikuti titik yang dipilih: angkanya dihitung dari blok piksel sekitar 240 m di sekitar titik itu, bukan rata-rata satu kelurahan. Dua titik dalam kelurahan yang sama bisa memberi hasil berbeda. Saat titik dipilih, batas kelurahannya disorot di peta.
 
-Dua lapis konteks bisa ditumpangkan di peta dan muncul di laporan: pola ruang RTRW dan geologi permukaan, masing-masing dengan laju median per kelas sebagai bahan analisis.
+Tiga lapis konteks bisa ditumpangkan di peta dan muncul di laporan: zona RDTR (rencana zona per blok, dasar KKPR), pola ruang RTRW, dan geologi permukaan, masing-masing dengan laju median per zona atau satuan sebagai bahan analisis.
 
 **Demo:** https://zhillanqisa.github.io/BTN-Housing-App/
 
@@ -16,12 +16,12 @@ Dua lapis konteks bisa ditumpangkan di peta dan muncul di laporan: pola ruang RT
 
 Pilih wilayah di bilah atas atau di kartu awal. Tautan menyimpan wilayahnya (`#/?w=jakarta`). Klik titik di wilayah lain langsung memindah wilayah.
 
-| Wilayah | Data | Piksel terukur | Antarlintasan (RMSE) | Pembanding GNSS | Geologi | Pola ruang |
+| Wilayah | Data | Piksel terukur | Antarlintasan (RMSE) | Pembanding GNSS | Geologi | Tata ruang |
 |---|---|---|---|---|---|---|
-| Kota Semarang | 1.433 interferogram | 82% | 0,34 cm/tahun | CSEM (titik ikat) | Lembar Magelang dan Semarang | RTRW Prov. Jateng 2024-2044 |
+| Kota Semarang | 1.433 interferogram | 82% | 0,34 cm/tahun | CSEM (titik ikat) | Lembar Magelang dan Semarang | RTRW Kota Semarang 1:25.000 (Distaru); RDTR belum terbuka |
 | DKI Jakarta | 1.056 interferogram | 95% | 0,45 cm/tahun | CBTU (titik ikat); periode sama 2020-2021: CJKT selisih 0,36, CTGR selisih 0,87 cm/tahun | Lembar Jakarta dan Kepulauan Seribu | RDTR DKI 2022 |
-| Kota Pekalongan | 1.022 interferogram (sementara, 64 descending masih antre) | 84% | 0,69 cm/tahun | CPKL (pembanding); periode sama 2020-2021: GNSS dan InSAR sama-sama 10,0 cm/tahun | Lembar Banjarnegara dan Pekalongan | tidak tersedia terbuka |
-| Kabupaten Demak | sedang diolah | | | CSEM (titik ikat) | Lembar Kudus dan Salatiga | RTRW Prov. Jateng 2024-2044 |
+| Kota Pekalongan | 1.086 interferogram | 84% | 0,71 cm/tahun | CPKL (pembanding); periode sama 2020-2021: GNSS 10,00, InSAR 10,01 cm/tahun | Lembar Banjarnegara dan Pekalongan | RDTR Kota Pekalongan 2024-2044 (1:5.000) |
+| Kabupaten Demak | sedang diolah | | | CSEM (titik ikat) | Lembar Kudus dan Salatiga | RTRW Prov. Jateng 2024-2044; RDTR Mranggen bila geoportal Pemkab bisa diakses |
 
 Dashboard punya kartu **Perbandingan wilayah pesisir** (luas yang turun minimal 4 cm/tahun, kelurahan berkategori tinggi, kelurahan tercepat, gerbang mutu), dibaca dari `public/data/ringkasan-wilayah.json` yang ditulis `node scripts/ringkasan-wilayah.mjs`.
 
@@ -45,7 +45,7 @@ Hasil `dist/` berupa file statis dan bisa di-host gratis (GitHub Pages, Netlify,
 ## Alur demo yang disarankan
 
 1. Di halaman **Cek lokasi**, pilih wilayah di bilah atas, lalu klik kartu contoh (mis. "Tanah Mas" di Semarang, "Muara Angke" di Jakarta) atau cari alamat, atau klik titik mana pun di peta. Kotak hijau di peta menandai blok piksel yang dipakai untuk laporan, dan garis bercahaya menandai batas kelurahannya.
-   Di legenda, pilih **Lapis konteks** RTRW atau Geologi untuk menumpangkan pola ruang atau satuan geologi. Bagian **Konteks lokasi** di laporan menyebut kelas di titik itu.
+   Di legenda, pilih **Lapis konteks** RDTR, RTRW, atau Geologi untuk menumpangkan zona tata ruang atau satuan geologi. Bagian **Konteks lokasi** di laporan menyebut sub-zona (mis. Perumahan Kepadatan Tinggi), zonanya, dan satuan geologi di titik itu.
 2. Baca **Laporan Ambles**: status di titik itu, grafik riwayat, lalu Proyeksi Tenor. Coba klik titik lain di kelurahan yang sama dan bandingkan angkanya.
 3. Ganti tenor 10, 15, 20 tahun dan lihat rumah pada gambar ikut turun.
 4. Tekan **Unduh PDF** untuk laporan satu halaman.
@@ -67,7 +67,7 @@ src/
     risk.ts            kategori, Proyeksi Tenor, kalimat laporan
     grid.ts            grid piksel: baca file, nilai piksel, statistik blok di sekitar titik
     lokasi.ts          bacaan satu lokasi (blok piksel, atau kelurahan bila data tanpa grid)
-    konteks.ts         lapis konteks (pola ruang RTRW, geologi): muat, validasi, kelas di satu titik
+    konteks.ts         lapis konteks (zona RDTR, pola ruang RTRW, geologi): muat, validasi, kelas di satu titik
     data.ts            muat dan validasi ringkasan per kelurahan
     importer.ts        impor CSV / GeoJSON
     pdf.ts             PDF Laporan Ambles (jsPDF, vektor)
@@ -83,7 +83,7 @@ scripts/
   build-demo-data.mjs  data demo ilustratif untuk uji antarmuka (npm run data:demo, menolak menimpa hasil olah asli tanpa --paksa)
 pipeline/              olah InSAR dari citra Sentinel-1 sampai file di public/data, dan lapis konteks (Python, lihat pipeline/README.md)
 data-raw/              batas kelurahan, kecamatan, kota (hasil skrip)
-data-raw/konteks/      shapefile pola ruang RTRW dan geologi permukaan, bisa disunting di QGIS
+data-raw/konteks/      shapefile zona RDTR, pola ruang RTRW, dan geologi permukaan, bisa disunting di QGIS
 public/data/           <wilayah>-grid.*, <wilayah>-kawasan.geojson, <wilayah>-konteks-*.geojson, ringkasan-wilayah.json
 ```
 
@@ -154,18 +154,21 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 
 ### Lapis konteks (peta dan laporan)
 
-`<wilayah>-konteks-rtrw.geojson` dan `<wilayah>-konteks-geologi.geojson`, ditulis oleh `pipeline/07_konteks.py`. Satu fitur = satu kelas.
+`<wilayah>-konteks-rdtr.geojson`, `<wilayah>-konteks-rtrw.geojson`, dan `<wilayah>-konteks-geologi.geojson`, ditulis oleh `pipeline/07_konteks.py`. Satu fitur = satu kelas (sub-zona untuk RDTR dan RTRW Kota, satuan untuk geologi).
 
-- Properti fitur: `kode`, `nama`, `warna` (hex). RTRW menambah `fungsi` (Lindung atau Budi daya). Geologi menambah `batuan` dan `sifat`.
+- Properti fitur: `kode`, `nama`, `warna` (hex). RDTR dan RTRW menambah `zona` (kelompok zona, mis. Perumahan untuk sub-zona Perumahan Kepadatan Tinggi) dan `fungsi` (Lindung atau Budi daya). Geologi menambah `batuan` dan `sifat`. Statistik RDTR dan RTRW dihitung per zona.
 - `metadata`: `judul`, `jenis` (`resmi` atau `perkiraan`), `skala`, `sumber`, `catatan`, `aturan` (cara digitasi atau perkiraan), dan `statistik`: per kelas `kode`, `nama`, `luasKm2`, `nPiksel`, `cakupan`, `median`, `p75`, `porsiTinggi` (bagian piksel yang turun minimal 4 cm/tahun).
 - Lapis konteks tidak mengubah kategori. Bila file tidak ada, aplikasi tetap jalan tanpa pilihan lapis itu.
 
 | Lapis | Sumber saat ini | Catatan |
 |---|---|---|
-| Pola ruang (Semarang, Demak) | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000. RTRW kota/kabupaten yang rinci tidak bisa diambil pada 14 November 2026 |
-| Pola ruang (Pekalongan) | Belum ada | Layanan provinsi yang terbuka hanya memuat Kendal, Semarang, Demak, dan Jepara; RTRW Kota Pekalongan belum ada dari sumber resmi yang terbuka (dicek 15 November 2026) |
+| Zona RDTR (Pekalongan) | Peta Rencana Pola Ruang RDTR Kota Pekalongan 2024-2044, WFS geoportal Pemkot (`palapa:POLARUANG_AR_5K`) | Skala 1:5.000, 33 sub-zona dikelompokkan ke 18 zona. Badan Jalan tidak ditampilkan. Nomor Perwal belum tercantum di metadata |
+| Zona RDTR (Demak) | RDTR Kawasan Mranggen, WFS geoportal Pemkab Demak | Hanya Mranggen. GeoServer Pemkab sedang 503 pada 15 November 2026; `07_konteks.py` melewatinya bila layanan menolak. RDTR pesisir Sayung belum ada di geoportal itu |
+| Pola ruang RTRW (Semarang) | Pola Ruang skala 1:25.000, Dinas Penataan Ruang Kota Semarang, WFS geoportal Pemkot (`palapa:POLARUANG_AR_25K`) | 39 sub-zona dikelompokkan ke 17 zona. RDTR Kota Semarang belum tersedia terbuka (dicek 15 November 2026) |
+| Pola ruang RTRW (Demak) | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000 |
+| Pola ruang RTRW (Pekalongan, Jakarta) | Belum ada | Pekalongan: layanan provinsi hanya memuat Kendal, Semarang, Demak, dan Jepara. Jakarta memakai RDTR |
 | Persil (bidang tanah) | BHUMI ATR/BPN (bhumi.atrbpn.go.id/peta), ditautkan dari laporan bersama koordinat titik | BHUMI tidak menyediakan layanan peta terbuka untuk aplikasi lain dan dilindungi firewall serta reCAPTCHA, jadi batas persil tidak ditampilkan langsung (dicek 15 November 2026) |
-| Pola ruang (Jakarta) | RDTR DKI Jakarta 2022 (Pergub Nomor 31 Tahun 2022), layanan peta publik DPMPTSP DKI | Rinci sampai blok. Badan Jalan tidak ditampilkan; celah jalan antarblok ditutup supaya peta ringan |
+| Zona RDTR (Jakarta) | RDTR DKI Jakarta 2022 (Pergub Nomor 31 Tahun 2022), layanan peta publik DPMPTSP DKI | Rinci sampai blok. Badan Jalan tidak ditampilkan; celah jalan antarblok ditutup supaya peta ringan |
 | Geologi (Semarang) | Peta Geologi Lembar Magelang dan Semarang 1:100.000 (Thanden dkk. 1996), didigitasi dengan `pipeline/07a_digitasi_geologi.py` | 7 satuan. Batas Aluvium cocok 87% dengan kaki bukit pada DEM tanpa digeser |
 | Geologi (Jakarta, Pekalongan, Demak) | Lembar Jakarta dan Kepulauan Seribu (Turkandi dkk. 1992), Banjarnegara dan Pekalongan (Condon dkk. 1996), Kudus (Suwarti dan Wikarno 1992), dan Salatiga (Sukardi dan Budhitrisna 1992); didigitasi dengan `pipeline/07b_geologi_lembar.py` | Warna satuan diambil dari kotak legenda lembar itu sendiri. Ketelitian batas sekitar 100 sampai 200 m |
 
@@ -213,7 +216,7 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 
 - Belum ada pembanding lapangan di kawasan yang ambles. Stasiun GNSS terbuka satu-satunya di kota (CSEM) berada di area stabil dan dipakai sebagai titik ikat. Bila tim memperoleh data sipat datar atau GNSS di Semarang bawah, bandingkan dengan laporan titik di lokasi itu.
 - 18% piksel kota tidak terukur, terutama tambak dan pesisir Tugu serta lereng bervegetasi di Mijen dan Gunungpati. Di sana aplikasi menulis "data tidak memadai".
-- Lapis pola ruang memakai RTRW Provinsi (skala 1:250.000), terlalu kasar untuk memastikan peruntukan satu persil. RTRW Kota Semarang perlu diminta ke Dinas Penataan Ruang atau diakses lewat GISTARU dengan token.
+- RDTR terbuka baru ada untuk Jakarta, Kota Pekalongan, dan Kawasan Mranggen (Demak). Semarang memakai RTRW Kota 1:25.000 dan Demak di luar Mranggen memakai RTRW Provinsi 1:250.000, keduanya belum cukup untuk memastikan peruntukan satu persil. Kepastian tetap di KKPR. GISTARU ATR/BPN menyimpan RDTR nasional di balik token.
 - Lapis geologi berskala 1:100.000 dan menggambarkan batuan di permukaan, bukan tebal endapan lunak di bawah satu persil. Peta Geologi Kuarter Lembar Semarang 1:50.000 yang lebih rinci untuk endapan muda belum didigitasi.
 - Lapis rob tidak dipakai: InaRISK BNPB tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis rob khusus. Elevasi dari DEM global juga tidak ditampilkan karena galatnya beberapa meter.
 - Data berhenti di November 2026. Pembaruan berarti menjalankan ulang pipeline; belum otomatis.
@@ -225,7 +228,7 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 - Citra radar: berisi data Copernicus Sentinel yang dimodifikasi (2020 sampai 2026), diunduh lewat Alaska Satellite Facility.
 - Interferogram: ASF HyP3. Deret waktu: MintPy (Yunjun, Fattahi & Amelung 2019).
 - GNSS (CSEM, CBTU, CJKT, CTGR, CPKL): Susilo dkk. (2023), Zenodo `10.5281/zenodo.7775016`, CC BY 4.0.
-- Pola ruang: RTRW Provinsi Jawa Tengah 2024-2044 (Perda Provinsi Jawa Tengah Nomor 8 Tahun 2024); RDTR DKI Jakarta 2022 (Peraturan Gubernur DKI Jakarta Nomor 31 Tahun 2022), layanan DPMPTSP DKI.
+- Tata ruang: RDTR DKI Jakarta 2022 (Peraturan Gubernur DKI Jakarta Nomor 31 Tahun 2022), layanan DPMPTSP DKI; Peta Rencana Pola Ruang RDTR Kota Pekalongan 2024-2044, Geoportal Kota Pekalongan; Pola Ruang skala 1:25.000, Dinas Penataan Ruang Kota Semarang, Geoportal Kota Semarang; RTRW Provinsi Jawa Tengah 2024-2044 (Perda Provinsi Jawa Tengah Nomor 8 Tahun 2024); RDTR Kawasan Mranggen, Geoportal Kabupaten Demak (bila termuat).
 - DEM: Copernicus GLO-30, © DLR e.V. 2010-2014 dan © Airbus Defence and Space GmbH 2014-2018, disediakan di bawah program Copernicus.
 - Geologi (semua raster dari GeoMap Badan Geologi, milik Pusat Survei Geologi, tidak diperjualbelikan, tidak disimpan di repo): Thanden, Sumadirdja, Richards, Sutisna dan Amin (1996), Lembar Magelang dan Semarang; Turkandi, Sidarto, Agustiyanto dan Purbo Hadiwidjoyo (1992), Lembar Jakarta dan Kepulauan Seribu; Condon, Pardyanto, Ketner, Amin, Gafoer dan Samodra (1996), Lembar Banjarnegara dan Pekalongan; Suwarti dan Wikarno (1992), Lembar Kudus; Sukardi dan Budhitrisna (1992), Lembar Salatiga; semuanya skala 1:100.000.
 - Batas wilayah: Semarang dan Jakarta © OpenStreetMap contributors (ODbL); Pekalongan dan Demak dari BPS 2020 lewat OCHA HDX (CC BY-IGO).

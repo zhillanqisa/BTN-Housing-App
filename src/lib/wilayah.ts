@@ -1,5 +1,5 @@
 // Wilayah yang dicakup SubTen. Tiap wilayah punya berkas data sendiri di public/data:
-//   <id>-kawasan.geojson, <id>-grid.json (+ .bin), <id>-konteks-rtrw.geojson, <id>-konteks-geologi.geojson
+//   <id>-kawasan.geojson, <id>-grid.json (+ .bin), <id>-konteks-{rdtr,rtrw,geologi}.geojson
 // Ditulis oleh pipeline/06_ekspor.py dan pipeline/07_konteks.py dengan PA_WILAYAH=<id>.
 import type { BBox, Position } from './types'
 
@@ -163,6 +163,10 @@ export function urlWilayah(id: IdWilayah) {
   return {
     kawasan: `${dasar()}${id}-kawasan.geojson`,
     grid: `${dasar()}${id}-grid.json`,
-    konteks: { rtrw: `${dasar()}${id}-konteks-rtrw.geojson`, geologi: `${dasar()}${id}-konteks-geologi.geojson` },
+    konteks: {
+      rdtr: `${dasar()}${id}-konteks-rdtr.geojson`,
+      rtrw: `${dasar()}${id}-konteks-rtrw.geojson`,
+      geologi: `${dasar()}${id}-konteks-geologi.geojson`,
+    },
   }
 }

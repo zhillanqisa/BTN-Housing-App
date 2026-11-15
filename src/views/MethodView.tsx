@@ -94,8 +94,8 @@ const TEKS: Record<IdWilayah, { acuan: string; validasi: string; gnss: string; b
     gnss: 'Di Kota Semarang hanya ada satu stasiun GNSS terbuka, yaitu CSEM, dan letaknya di area stabil. Karena itu GNSS dipakai sebagai titik ikat. Area yang ambles diperiksa lewat kecocokan dua lintasan satelit yang saling independen dan lewat kisaran angka penelitian terdahulu.',
     batasan: 'Validasi di Semarang bagian bawah masih terbatas karena stasiun GNSS acuan (CSEM) berada di area stabil.',
     cekSumber:
-      'Sumber konteks dicek pada 13 dan 14 November 2026. RTRW Kota Semarang tidak bisa diambil: layanan GISTARU meminta token, sedangkan geoportal Pemkot dan Satu Peta BIG tidak merespons. Karena itu lapis pola ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Layanan peta geologi ESDM sedang pemeliharaan, jadi raster Peta Geologi Lembar Magelang dan Semarang diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Peta Geologi Kuarter Lembar Semarang 1:50.000 yang lebih rinci belum diolah.',
-    gantiResmi: 'Bila tim memperoleh RTRW Kota Semarang (Perda Nomor 14 Tahun 2011, diubah dengan Perda Nomor 5 Tahun 2021) atau peta geologi yang lebih rinci',
+      'Sumber konteks dicek pada 13 sampai 15 November 2026. Lapis pola ruang memakai peta Pola Ruang skala 1:25.000 dari Dinas Penataan Ruang Kota Semarang, yang terbuka lewat layanan WFS geoportal Pemkot, dikelompokkan per zona. RDTR Kota Semarang belum tersedia terbuka, dan layanan GISTARU ATR/BPN meminta token. Layanan peta geologi ESDM sedang pemeliharaan, jadi raster Peta Geologi Lembar Magelang dan Semarang diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Peta Geologi Kuarter Lembar Semarang 1:50.000 yang lebih rinci belum diolah.',
+    gantiResmi: 'Bila tim memperoleh RDTR Kota Semarang atau peta geologi yang lebih rinci',
     batas: 'Batas wilayah © OpenStreetMap contributors (ODbL).',
   },
   jakarta: {
@@ -104,7 +104,7 @@ const TEKS: Record<IdWilayah, { acuan: string; validasi: string; gnss: string; b
     gnss: 'Di Jakarta ada tiga stasiun GNSS terbuka. CBTU yang stabil dipakai sebagai titik ikat. CJKT dan CTGR tidak dipakai saat olah, sehingga menjadi pembanding independen. Ketiganya berada di area yang relatif stabil, jadi area ambles cepat di pesisir utara diperiksa lewat kecocokan dua lintasan satelit dan kisaran angka penelitian terdahulu.',
     batasan: 'Stasiun GNSS terbuka di Jakarta berada di area relatif stabil; pesisir utara yang ambles cepat divalidasi lewat dua lintasan satelit.',
     cekSumber:
-      'Sumber konteks dicek pada 14 November 2026. Lapis pola ruang memakai RDTR DKI Jakarta 2022 (Pergub 31/2022) dari layanan peta publik DPMPTSP DKI, dirapikan per zona. Raster Peta Geologi Lembar Jakarta dan Kepulauan Seribu diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi: warna tiap satuan diambil dari kotak legenda lembar itu sendiri.',
+      'Sumber konteks dicek pada 14 November 2026. Lapis zona RDTR memakai RDTR DKI Jakarta 2022 (Pergub 31/2022) dari layanan peta publik DPMPTSP DKI, dirapikan per zona. Raster Peta Geologi Lembar Jakarta dan Kepulauan Seribu diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi: warna tiap satuan diambil dari kotak legenda lembar itu sendiri.',
     gantiResmi: 'Bila tim memperoleh peta geologi teknik atau data bor yang lebih rinci',
     batas: 'Batas wilayah © OpenStreetMap contributors (ODbL).',
   },
@@ -114,7 +114,7 @@ const TEKS: Record<IdWilayah, { acuan: string; validasi: string; gnss: string; b
     gnss: 'Pekalongan tidak punya stasiun GNSS terbuka di area stabil. Stasiun CPKL justru berada di kota yang ambles cepat. Karena itu acuan diambil dari tanah tinggi di selatan, dan CPKL dipakai sebagai pembanding independen di area yang ambles.',
     batasan: 'Acuan Pekalongan memakai tanah tinggi yang dianggap stabil, bukan stasiun GNSS. Bila tanah tinggi itu ikut bergerak, seluruh angka bergeser sebesar gerak itu.',
     cekSumber:
-      'Sumber konteks dicek pada 15 November 2026. Layanan publik RTRW Provinsi Jawa Tengah hanya memuat Kendal, Semarang, Demak, dan Jepara, dan RTRW Kota Pekalongan belum tersedia terbuka dari sumber resmi, jadi lapis pola ruang belum ada. Raster Peta Geologi Lembar Banjarnegara dan Pekalongan diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Seluruh Kota Pekalongan berada di satuan Aluvium.',
+      'Sumber konteks dicek pada 15 November 2026. Lapis zona RDTR memakai Peta Rencana Pola Ruang RDTR Kota Pekalongan 2024-2044 (skala 1:5.000) dari layanan WFS geoportal Pemkot. RTRW Kota Pekalongan belum tersedia terbuka, dan layanan publik RTRW Provinsi Jawa Tengah hanya memuat Kendal, Semarang, Demak, dan Jepara. Raster Peta Geologi Lembar Banjarnegara dan Pekalongan diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Seluruh Kota Pekalongan berada di satuan Aluvium.',
     gantiResmi: 'Bila tim memperoleh RTRW Kota Pekalongan atau data bor yang menunjukkan tebal endapan lunak',
     batas: 'Batas wilayah: BPS 2020 lewat OCHA HDX (CC BY-IGO).',
   },
@@ -124,19 +124,39 @@ const TEKS: Record<IdWilayah, { acuan: string; validasi: string; gnss: string; b
     gnss: 'Demak tidak punya stasiun GNSS terbuka sendiri. Titik ikat memakai CSEM di Semarang yang stabil dan masih masuk kotak olah. Pesisir Sayung yang ambles cepat diperiksa lewat kecocokan dua lintasan satelit dan kisaran angka penelitian terdahulu.',
     batasan: 'Demak tidak punya stasiun GNSS pembanding; validasi bergantung pada kecocokan dua lintasan satelit.',
     cekSumber:
-      'Sumber konteks dicek pada 14 November 2026. Lapis pola ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Raster Peta Geologi Lembar Kudus dan Lembar Salatiga diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Jalur sempit di barat 110°30′ BT diisi dari tepi lembar Kudus.',
+      'Sumber konteks dicek pada 14 dan 15 November 2026. Lapis pola ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Lapis zona RDTR memakai RDTR Kawasan Mranggen dari geoportal Pemkab Demak bila layanannya bisa diakses (15 November 2026 sedang pemeliharaan); RDTR untuk pesisir Sayung belum ada di geoportal itu. Raster Peta Geologi Lembar Kudus dan Lembar Salatiga diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Jalur sempit di barat 110°30′ BT diisi dari tepi lembar Kudus.',
     gantiResmi: 'Bila tim memperoleh RTRW Kabupaten Demak atau data bor yang menunjukkan tebal endapan lunak',
     batas: 'Batas wilayah: BPS 2020 lewat OCHA HDX (CC BY-IGO).',
   },
 }
 
-/** Sumber konteks khusus tiap wilayah: pola ruang dan peta geologi. */
-// tanpaPolaRuang: tidak ada layanan pola ruang resmi yang terbuka untuk wilayah ini.
-const SUMBER_KONTEKS: Record<IdWilayah, { tataRuang: [string, string][]; peta: string; kuarter?: string; tanpaPolaRuang?: boolean }> = {
-  semarang: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)'], ['RTRW Kota Semarang (GISTARU, geoportal Pemkot)', 'Pola ruang rinci']], peta: 'Peta Geologi Lembar Magelang dan Semarang 1:100.000 (PSG)', kuarter: 'Peta Geologi Kuarter Lembar Semarang 1:50.000 (PSG)' },
-  jakarta: { tataRuang: [['RDTR DKI Jakarta 2022 (Pergub 31/2022), layanan DPMPTSP DKI', 'Lapis pola ruang (rinci)']], peta: 'Peta Geologi Lembar Jakarta dan Kepulauan Seribu 1:100.000 (PSG)' },
-  pekalongan: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Layanan publiknya tidak mencakup Kota Pekalongan'], ['RTRW Kota Pekalongan', 'Pola ruang kota']], tanpaPolaRuang: true, peta: 'Peta Geologi Lembar Banjarnegara dan Pekalongan 1:100.000 (PSG)' },
-  demak: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)']], peta: 'Peta Geologi Lembar Kudus dan Lembar Salatiga 1:100.000 (PSG)' },
+/** Sumber konteks khusus tiap wilayah: rencana tata ruang dan peta geologi.
+ *  Baris tata ruang: [sumber, kegunaan, lapis yang dibentuknya]. Lapis null = tidak tersedia terbuka. */
+const SUMBER_KONTEKS: Record<IdWilayah, { tataRuang: [string, string, 'rdtr' | 'rtrw' | null][]; peta: string; kuarter?: string }> = {
+  semarang: {
+    tataRuang: [
+      ['RTRW Kota Semarang, Distaru (geoportal Pemkot, 1:25.000)', 'Lapis pola ruang RTRW', 'rtrw'],
+      ['RDTR Kota Semarang', 'Zona rinci per blok', null],
+    ],
+    peta: 'Peta Geologi Lembar Magelang dan Semarang 1:100.000 (PSG)',
+    kuarter: 'Peta Geologi Kuarter Lembar Semarang 1:50.000 (PSG)',
+  },
+  jakarta: { tataRuang: [['RDTR DKI Jakarta 2022 (Pergub 31/2022), layanan DPMPTSP DKI', 'Lapis zona RDTR', 'rdtr']], peta: 'Peta Geologi Lembar Jakarta dan Kepulauan Seribu 1:100.000 (PSG)' },
+  pekalongan: {
+    tataRuang: [
+      ['RDTR Kota Pekalongan 2024-2044 (geoportal Pemkot, 1:5.000)', 'Lapis zona RDTR', 'rdtr'],
+      ['RTRW Kota Pekalongan', 'Pola ruang kota', null],
+      ['RTRW Provinsi Jawa Tengah 2024-2044', 'Layanan publiknya tidak mencakup Kota Pekalongan', null],
+    ],
+    peta: 'Peta Geologi Lembar Banjarnegara dan Pekalongan 1:100.000 (PSG)',
+  },
+  demak: {
+    tataRuang: [
+      ['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang RTRW (skala provinsi)', 'rtrw'],
+      ['RDTR Kawasan Mranggen (geoportal Pemkab Demak)', 'Lapis zona RDTR, hanya Kawasan Mranggen', 'rdtr'],
+    ],
+    peta: 'Peta Geologi Lembar Kudus dan Lembar Salatiga 1:100.000 (PSG)',
+  },
 }
 
 function susunSumber(meta: DatasetMeta | null, konteks: Partial<Record<JenisLapis, LapisKonteks>>, wilayah: IdWilayah): [string, string, StatusPil][] {
@@ -150,8 +170,8 @@ function susunSumber(meta: DatasetMeta | null, konteks: Partial<Record<JenisLapi
     ['Sentinel-1 lewat ASF HyP3', 'Laju penurunan', p ? 'Dipakai' : 'Rencana'],
     ['GNSS CORS Pantura (Susilo dkk. 2023)', 'Titik ikat dan validasi', p?.validasi?.gnss?.length ? 'Dipakai' : 'Rencana'],
     ['DEM Copernicus GLO-30', geologiResmi ? 'Koreksi saat olah, dan cek batas satuan geologi' : 'Koreksi saat olah, dan perkiraan satuan geologi', p || konteks.geologi ? 'Dipakai' : 'Rencana'],
-    // Baris berikut: hasil cek layanan publik pada 13 dan 14 November 2026 (lihat catatan di bawah tabel).
-    ...sk.tataRuang.map(([a, b], i): [string, string, StatusPil] => [a, b, i === 0 && !sk.tanpaPolaRuang ? (konteks.rtrw ? 'Dipakai' : 'Rencana') : 'Tidak tersedia terbuka']),
+    // Baris berikut: hasil cek layanan publik pada 13 sampai 15 November 2026 (lihat catatan di bawah tabel).
+    ...sk.tataRuang.map(([a, b, j]): [string, string, StatusPil] => [a, b, j ? (konteks[j] ? 'Dipakai' : 'Rencana') : 'Tidak tersedia terbuka']),
     [sk.peta, 'Lapis geologi, didigitasi tim', geologiResmi ? 'Dipakai' : 'Perlu akun'],
     ...(geologiResmi ? [] : [['Satuan geologi dari bentuk lahan', 'Lapis geologi sementara', konteks.geologi ? 'Perkiraan' : 'Tidak tersedia terbuka'] as [string, string, StatusPil]]),
     ...(sk.kuarter ? [[sk.kuarter, 'Rincian endapan muda', 'Perlu akun'] as [string, string, StatusPil]] : []),
@@ -218,13 +238,29 @@ function ringkasGeologi(lapis: LapisKonteks): string | null {
   return `Median laju di Aluvium ${fmt(Math.max(0, a.median), 1)} cm/tahun dan ${persen(a.porsiTinggi ?? 0)} pikselnya turun minimal 4 cm/tahun. Di ${lain.length === 1 ? 'satuan batuan lain' : `${lain.length} satuan batuan lainnya`}, median paling tinggi ${fmt(Math.max(0, medLain), 1)} cm/tahun dan piksel yang turun secepat itu paling banyak ${persen(porsiLain)}.`
 }
 
+/** Dua sub-zona terluas sebagai contoh, mis. "Perumahan Kepadatan Tinggi, SPU Skala Kelurahan". */
+function contohSubzona(l: LapisKonteks): string {
+  const beda = l.fitur.filter((f) => f.zona && f.zona !== f.nama)
+  const luas = (f: (typeof beda)[number]) => (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1])
+  const zonaTerpakai = new Set<string>()
+  const pilih: string[] = []
+  for (const f of [...beda].sort((a, b) => luas(b) - luas(a))) {
+    if (zonaTerpakai.has(f.zona!)) continue
+    zonaTerpakai.add(f.zona!)
+    pilih.push(f.nama)
+    if (pilih.length === 2) break
+  }
+  return `mis. ${pilih.join(', ')}`
+}
+
 function BagianKonteks({ konteks, wilayah }: { konteks: Partial<Record<JenisLapis, LapisKonteks>>; wilayah: IdWilayah }) {
   const ada = JENIS_LAPIS.filter((j) => konteks[j])
   return (
     <>
       <p>
-        Dua lapis tambahan membantu membaca angka laju: pola ruang dari RTRW dan geologi permukaan. Keduanya bisa ditampilkan di peta lewat pilihan Lapis konteks di legenda, dan kelas di titik terpilih muncul
-        di laporan. Lapis konteks tidak mengubah kategori. Kategori tetap hanya dari laju yang terukur satelit.
+        Lapis tambahan membantu membaca angka laju: zona RDTR (paling rinci, dasar KKPR untuk izin bangunan), pola ruang RTRW, dan geologi permukaan. Tidak semua wilayah punya ketiganya. Semuanya bisa
+        ditampilkan di peta lewat pilihan Lapis konteks di legenda, dan kelas di titik terpilih muncul di laporan. Lapis konteks tidak mengubah kategori. Kategori tetap hanya dari laju yang terukur
+        satelit.
       </p>
       <p>Tabel di bawah menghitung laju dari piksel yang sama dengan yang tampil di peta, dikelompokkan menurut kelas tiap lapis.</p>
       {!ada.length && <p className="text-ink-3">Lapis konteks belum termuat.</p>}
@@ -250,10 +286,15 @@ function BagianKonteks({ konteks, wilayah }: { konteks: Partial<Record<JenisLapi
                 cepat. Angka pengukuran di titik itu tetap yang utama.
               </p>
             )}
-            {j === 'rtrw' && (
+            {j === 'rtrw' && /provinsi/i.test(l.meta.skala) && (
               <p className="text-[13.5px]">
                 Pada skala provinsi sebagian besar kota tercatat sebagai Kawasan Permukiman, jadi statistik per kelas hanya gambaran kasar. Kelas dengan laju tinggi, seperti kawasan transportasi di pelabuhan, bandara,
                 dan sekitarnya, tetap memberi petunjuk di mana infrastruktur besar ikut terdampak.
+              </p>
+            )}
+            {j !== 'geologi' && l.fitur.some((f) => f.zona && f.zona !== f.nama) && (
+              <p className="text-[13.5px]">
+                Warna peta dan tabel di bawah dikelompokkan per zona. Tiap blok tetap menyimpan sub-zona aslinya ({contohSubzona(l)}), dan sub-zona itulah yang tampil di laporan titik.
               </p>
             )}
             <TabelKonteks lapis={l} />

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowRight, CircleNotch, CornersOut, Crosshair, Minus, Plus, Stack, X } from '@phosphor-icons/react'
 import { LAJU_BINS, LABEL_KATEGORI } from '../lib/config'
 import { fmt } from '../lib/format'
-import { LABEL_LAPIS, type JenisLapis, type LapisKonteks } from '../lib/konteks'
+import { JENIS_LAPIS, LABEL_LAPIS, LABEL_SINGKAT, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { useLayarKecil } from '../lib/layar'
 import { navigasi } from '../lib/router'
 import { jembatanPeta, useApp } from '../lib/store'
@@ -60,7 +60,7 @@ function IsiLegenda() {
   const lapisKonteks = useApp((s) => s.lapisKonteks)
   const setLapisKonteks = useApp((s) => s.setLapisKonteks)
   const lapisAktif = lapisKonteks ? konteks[lapisKonteks] : undefined
-  const adaKonteks = !!(konteks.rtrw || konteks.geologi)
+  const adaKonteks = JENIS_LAPIS.some((j) => konteks[j])
 
   return (
     <>
@@ -128,8 +128,7 @@ function IsiLegenda() {
             onUbah={(v) => setLapisKonteks(v === 'tidak' ? null : v)}
             opsi={[
               { nilai: 'tidak', label: 'Tidak' },
-              ...(konteks.rtrw ? [{ nilai: 'rtrw' as const, label: 'RTRW' }] : []),
-              ...(konteks.geologi ? [{ nilai: 'geologi' as const, label: 'Geologi' }] : []),
+              ...JENIS_LAPIS.filter((j) => konteks[j]).map((j) => ({ nilai: j, label: LABEL_SINGKAT[j] })),
             ]}
           />
           {lapisAktif && <LegendaKonteks lapis={lapisAktif} />}

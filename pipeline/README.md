@@ -35,17 +35,17 @@ node scripts/ringkasan-wilayah.mjs                         # kartu perbandingan 
 | Laju tertinggi | 7,9 cm/tahun per piksel (Muara Angke); kelurahan tertinggi Pluit dan Kamal Muara 1,9 cm/tahun |
 | Gerbang mutu | lulus |
 
-### Hasil Pekalongan (15 November 2026, sementara)
+### Hasil Pekalongan (15 November 2026)
 
-Dihitung dari 512 interferogram ascending dan 510 dari 575 descending; diulang setelah sisa antrean HyP3 selesai.
+Dihitung dari 512 interferogram ascending dan 574 dari 575 descending (satu pasangan tanpa baseline dibuang, lihat temuan 7).
 
 | Ukuran | Nilai |
 |---|---|
-| Piksel kota terukur | 84% (6.025 dari 7.212) |
-| Selisih ascending dan descending | RMSE 0,69 cm/tahun, bias -0,61, korelasi 0,985 |
-| GNSS CPKL (pembanding, di kota yang ambles) | periode sama 2020-2021: GNSS 10,00, InSAR 10,00 cm/tahun. Seluruh catatan: GNSS 11,56 (2010-2021), InSAR 7,78 (2020-2026) |
-| Laju di CPKL per periode (InSAR) | 10,0 (2020-2021), 7,2 (2022-2023), 6,7 (2024-2026) cm/tahun: melambat |
-| Laju kota | median 6,9 cm/tahun, maksimum 11,1 per piksel; 25 dari 27 kelurahan kategori tinggi |
+| Piksel kota terukur | 84% (6.067 dari 7.212) |
+| Selisih ascending dan descending | RMSE 0,71 cm/tahun, bias -0,63, korelasi 0,984 |
+| GNSS CPKL (pembanding, di kota yang ambles) | periode sama 2020-2021: GNSS 10,00, InSAR 10,01 cm/tahun. Seluruh catatan: GNSS 11,56 (2010-2021), InSAR 7,78 (2020-2026) |
+| Laju di CPKL per periode (InSAR) | 10,0 (2020-2021), 7,2 (2022-2023), 6,8 (2024-2026) cm/tahun: melambat |
+| Laju kota | median 6,9 cm/tahun, maksimum 11,0 per piksel; 35,4 km² turun minimal 4 cm/tahun; 26 dari 27 kelurahan kategori tinggi |
 | Gerbang mutu | lulus |
 
 ### Temuan saat olah wilayah baru
@@ -59,6 +59,7 @@ Dihitung dari 512 interferogram ascending dan 510 dari 575 descending; diulang s
 7. **Baseline NaN di produk HyP3.** Satu produk descending Pekalongan (20240818_20240911) berisi `Baseline: nan`. Inversi baseline MintPy lalu gagal dengan "SVD did not converge in Linear Least Squares". `04_mintpy.py` sekarang membuang pasangan seperti itu lewat `mintpy.network.excludeDate12`.
 8. **Zip setengah jadi.** Unduhan yang terputus meninggalkan zip rusak yang terus dipakai di putaran berikutnya ("pita unw_phase tidak ada di zip"). `03_unduh_potong.py` kini menghapus zip yang gagal diunduh atau tidak terbaca.
 9. **RTRW Kota Pekalongan tidak tersedia terbuka.** Layanan pola ruang Provinsi Jawa Tengah yang terbuka hanya memuat Kendal, Semarang, Demak, dan Jepara. Layanan "RTRW_KOTA_PEKALONGAN" di ArcGIS Online milik akun pribadi tanpa sumber dan lisensi, jadi tidak dipakai. `07_konteks.py` melewati lapis pola ruang bila layanan provinsi tidak punya fitur di wilayah itu.
+10. **RDTR dari geoportal Palapa pemda.** Geoportal Kota Pekalongan, Kota Semarang, dan Kabupaten Demak memakai GeoServer dengan WFS terbuka. Pekalongan punya RDTR 2024-2044 (1:5.000), Semarang hanya pola ruang RTRW 1:25.000, Demak punya RDTR Mranggen (layanannya 503 saat dicek). Dua jebakan: respons utuh belasan MB terputus di tengah ("Response ended prematurely"), jadi diunduh per 1.000 fitur; dan keluaran derajat dibulatkan server ke 4 desimal (sekitar 11 m), jadi diminta dalam UTM lalu diproyeksikan ulang. Sertifikat Let's Encrypt baru di geoportal Demak belum dikenal paket certifi, jadi unduhan jatuh ke `curl.exe` Windows yang memakai penyimpanan sertifikat sistem. Sub-zona dikelompokkan ke zona Permen ATR/BPN 14/2021 (`ZONA_ATURAN`); warna dan statistik per zona, laporan menyebut sub-zonanya. GISTARU ATR/BPN tidak dipakai: daftar layanannya kosong tanpa token, dan aplikasinya mengambil data lewat proxy.
 
 ## Status Semarang
 
@@ -73,7 +74,7 @@ Semua langkah sudah dijalankan penuh pada 14 November 2026.
 | 5. Gerak vertikal dan validasi | `05_vertikal_validasi.py` | Gerbang mutu lulus |
 | 6. Ekspor grid dan ringkasan kelurahan | `06_ekspor.py` | 49.830 piksel terukur, 177 kelurahan |
 | 7a. Digitasi peta geologi PSG | `07a_digitasi_geologi.py` | 7 satuan batuan di dalam kota |
-| 7. Lapis konteks: pola ruang dan geologi | `07_konteks.py` | 9 kelas pola ruang, 7 satuan geologi, statistik laju per kelas |
+| 7. Lapis konteks: zona RDTR, pola ruang RTRW, dan geologi | `07_konteks.py` | Semarang: 17 zona RTRW Kota (39 sub-zona), 7 satuan geologi, statistik laju per zona dan satuan |
 
 `status_hyp3.py` menampilkan status job di HyP3 dan sisa kredit.
 
@@ -111,8 +112,9 @@ Sumber dicek 14 November 2026:
 
 | Data | Yang dicoba | Hasil |
 |---|---|---|
-| RTRW Kota Semarang | GISTARU, geoportal Pemkot (`geoportal.data.semarangkota.go.id`), Satu Peta BIG, katalog Tanah Air Indonesia | GISTARU meminta token; yang lain tidak merespons atau menolak (403) |
-| RTRW Provinsi Jawa Tengah 2024-2044 | Layanan ArcGIS publik "Peta Rencana Perda Jawa Tengah No 8 Tahun 2024" | Terbuka. Dipakai, skala provinsi |
+| RTRW Kota Semarang | GISTARU, geoportal Pemkot, Satu Peta BIG, katalog Tanah Air Indonesia | 14 November: GISTARU meminta token, yang lain tidak merespons atau menolak. 15 November: WFS `geoportal.semarangkota.go.id/geoserver/palapa` terbuka, lapis `POLARUANG_AR_25K` (Distaru, 1:25.000). Dipakai |
+| RDTR Kota Semarang | Katalog CSW dan WFS geoportal Pemkot, GISTARU | Tidak ada di geoportal; GISTARU meminta token |
+| RTRW Provinsi Jawa Tengah 2024-2044 | Layanan ArcGIS publik "Peta Rencana Perda Jawa Tengah No 8 Tahun 2024" | Terbuka. Dulu dipakai untuk Semarang, kini hanya Demak |
 | Peta geologi PSG | Layanan peta geologi ESDM, GeoMap Badan Geologi | ESDM sedang pemeliharaan. Raster Lembar Magelang dan Semarang 1:100.000 diunduh tim lewat akun GeoMap; lisensinya terbuka dengan menyebut sumber PSG, tidak untuk diperjualbelikan |
 | DEM Copernicus GLO-30 | AWS Open Data | Terbuka. Dipakai untuk memeriksa letak batas Aluvium hasil digitasi |
 
@@ -124,8 +126,9 @@ Hasil statistik (laju median dari grid aplikasi):
 |---|---|---|
 | Aluvium | 3,6 | 48% |
 | Enam satuan batuan lain | -0,1 sampai 0,0 | 0% |
-| Pola ruang: Kawasan Transportasi | 6,7 | 58% |
-| Pola ruang: Kawasan Permukiman | 0,0 | 18% |
+| RTRW Kota: Transportasi (pelabuhan, bandara, terminal) | 6,1 | 53% |
+| RTRW Kota: Campuran | 3,5 | 42% |
+| RTRW Kota: Perumahan (termasuk perbukitan selatan) | 0,0 | 19% |
 
 Untuk mengganti dengan data resmi, simpan SHP-nya lalu jalankan `07_konteks.py --rtrw <file>` atau `--geologi <file>`. Kolom yang dibutuhkan ada di docstring skrip.
 

@@ -1,22 +1,28 @@
-"""Langkah 7: lapis konteks untuk peta dan laporan: pola ruang RTRW dan geologi permukaan.
+"""Langkah 7: lapis konteks untuk peta dan laporan: pola ruang RTRW, zona RDTR, dan geologi permukaan.
 
 Keluaran:
-    data-raw/konteks/<wilayah>-rtrw-pola-ruang.shp     pola ruang di dalam wilayah (bisa dibuka dan disunting di QGIS)
+    data-raw/konteks/<wilayah>-rtrw-pola-ruang.shp     pola ruang RTRW di dalam wilayah (bisa dibuka dan disunting di QGIS)
+    data-raw/konteks/<wilayah>-rdtr-pola-ruang.shp     zona RDTR di dalam wilayah
     data-raw/konteks/<wilayah>-geologi-permukaan.shp   satuan geologi permukaan di dalam wilayah
-    public/data/konteks-rtrw.geojson         dibaca aplikasi, ditambah statistik laju per kelas
-    public/data/konteks-geologi.geojson      sama
+    public/data/<wilayah>-konteks-rtrw.geojson         dibaca aplikasi, ditambah statistik laju per zona
+    public/data/<wilayah>-konteks-rdtr.geojson         sama
+    public/data/<wilayah>-konteks-geologi.geojson      sama, per satuan
 
 Jalankan:
     python pipeline/07_konteks.py
     python pipeline/07_konteks.py --rtrw rtrw_kota.shp          pakai SHP RTRW Kota resmi
     python pipeline/07_konteks.py --geologi geologi_psg.shp     pakai SHP hasil digitasi peta geologi PSG
 
-Sumber bawaan (dicek 14 November 2026):
+Sumber bawaan (dicek 14 dan 15 November 2026):
 
-- Pola ruang: RTRW Provinsi Jawa Tengah 2024-2044 (Perda Provinsi Jawa Tengah Nomor 8 Tahun 2024),
-  dari layanan ArcGIS publik "Peta Rencana Perda Jawa Tengah No 8 Tahun 2024". Skala provinsi, jadi
-  kasar untuk tingkat persil. RTRW Kota Semarang yang lebih rinci (Perda Kota Semarang 5/2021) tidak bisa
-  diambil hari itu: geoportal Pemkot dan Satu Peta BIG tidak merespons, GISTARU meminta token.
+- RTRW: Kota Semarang dari geoportal Pemkot (Distaru, skala 1:25.000, WFS terbuka). Demak dari RTRW
+  Provinsi Jawa Tengah 2024-2044 (Perda Provinsi Jawa Tengah Nomor 8 Tahun 2024), lewat layanan ArcGIS
+  publik "Peta Rencana Perda Jawa Tengah No 8 Tahun 2024"; skala provinsi, jadi kasar untuk tingkat persil.
+  Layanan provinsi itu tidak memuat Kota Pekalongan.
+- RDTR: DKI Jakarta dari layanan DPMPTSP DKI (Pergub 31/2022). Kota Pekalongan dari geoportal Pemkot
+  (RDTR 2024-2044, skala 1:5.000). Demak: RDTR Mranggen di geoportal Pemkab (sedang tidak bisa diakses
+  15 November 2026; dilewati bila layanan menolak). Semarang belum punya RDTR yang terbuka. GISTARU
+  ATR/BPN menyembunyikan layanannya di balik token, jadi tidak dipakai.
 - Geologi: layanan peta geologi ESDM sedang pemeliharaan, dan raster peta PSG di GeoMap hanya bisa
   diunduh dengan akun. Sebagai pengganti sementara, satuan geologi permukaan diperkirakan dari bentuk
   lahan pada DEM Copernicus GLO-30: dataran rendah yang datar dan tersambung ke pantai dianggap endapan
@@ -29,6 +35,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import subprocess
+import time
 from datetime import date
 from pathlib import Path
 
@@ -79,6 +88,114 @@ URL_RTRW = (
     "https://services.arcgis.com/zmBQLV64TsFvEpV0/arcgis/rest/services/"
     "Peta_Rencana_Perda_Jawa_Tengah_No_8_Tahun_2024/FeatureServer/25/query"
 )
+
+# Pola ruang dari geoportal Palapa milik pemda (GeoServer, WFS terbuka). Dicek 15 November 2026.
+# toleransi = penyederhanaan garis (m), luas_min_ha = poligon lebih kecil dibuang, celah_m = celah jalan yang ditutup.
+RTRW_KOTA = {
+    "semarang": {
+        "wfs": "https://geoportal.semarangkota.go.id/geoserver/palapa/wfs",
+        "lapis": "palapa:POLARUANG_AR_25K",
+        "toleransi": 8, "luas_min_ha": 0.5, "celah_m": 6,
+        "meta": {
+            "judul": "Pola ruang RTRW Kota Semarang",
+            "jenis": "resmi",
+            "skala": "1:25.000, disederhanakan sekitar 8 m",
+            "sumber": [
+                {
+                    "nama": "Pola Ruang AR skala 1:25.000, Dinas Penataan Ruang Kota Semarang, Geoportal Kota Semarang",
+                    "url": "https://geoportal.semarangkota.go.id/main/",
+                    "catatan": "Layanan WFS palapa:POLARUANG_AR_25K, metadata diperbarui 6 Mei 2026. Nomor Perda tidak tercantum di metadata.",
+                }
+            ],
+        },
+        "catatan": (
+            "Pola ruang adalah rencana peruntukan lahan, bukan guna lahan saat ini. Peta RTRW Kota ini sudah memisahkan blok perumahan, "
+            "perdagangan, fasilitas umum, dan ruang terbuka, tetapi belum RDTR. Untuk kepastian satu persil, cek KKPR di Dinas Penataan Ruang Kota Semarang."
+        ),
+    },
+}
+RDTR = {
+    "pekalongan": {
+        "wfs": "https://geoportal.pekalongankota.go.id/geoserver/palapa/wfs",
+        "lapis": "palapa:POLARUANG_AR_5K",
+        "toleransi": 4, "luas_min_ha": 0.1, "celah_m": 5,
+        "meta": {
+            "judul": "Rencana pola ruang RDTR Kota Pekalongan 2024-2044",
+            "jenis": "resmi",
+            "skala": "1:5.000 (RDTR), disederhanakan sekitar 4 m",
+            "sumber": [
+                {
+                    "nama": "Peta Rencana Pola Ruang RDTR Kota Pekalongan Tahun 2024-2044, Geoportal Kota Pekalongan",
+                    "url": "https://geoportal.pekalongankota.go.id/main/",
+                    "catatan": "Layanan WFS palapa:POLARUANG_AR_5K. Nomor Peraturan Wali Kota tidak tercantum di metadata dan belum ditemukan di JDIH Kota Pekalongan (dicek 15 November 2026).",
+                }
+            ],
+        },
+        "catatan": (
+            "RDTR adalah rencana zona sampai tingkat blok dan menjadi dasar KKPR untuk izin bangunan. Di sini Badan Jalan tidak ditampilkan dan "
+            "poligon di bawah 0,1 ha dibuang. Untuk kepastian satu persil, cek KKPR lewat OSS atau Dinas Pekerjaan Umum dan Penataan Ruang Kota Pekalongan."
+        ),
+    },
+    "demak": {
+        "wfs": "https://geoportal.demakkab.go.id/geoserver/wfs",
+        "lapis": "DINPUTARU:polaruang_rdtr_mranggen_332120241115134829",
+        "toleransi": 4, "luas_min_ha": 0.1, "celah_m": 5,
+        "meta": {
+            "judul": "Rencana pola ruang RDTR Kawasan Mranggen",
+            "jenis": "resmi",
+            "skala": "1:5.000 (RDTR), disederhanakan sekitar 4 m",
+            "sumber": [
+                {
+                    "nama": "Pola Ruang RDTR Mranggen, Dinas Pekerjaan Umum dan Penataan Ruang Kabupaten Demak, Geoportal Kabupaten Demak",
+                    "url": "https://geoportal.demakkab.go.id/",
+                    "catatan": "Hanya mencakup Kawasan Mranggen, bukan seluruh kabupaten.",
+                }
+            ],
+        },
+        "catatan": (
+            "RDTR adalah rencana zona sampai tingkat blok dan menjadi dasar KKPR untuk izin bangunan. Lapis ini hanya mencakup Kawasan Mranggen. "
+            "Untuk kepastian satu persil, cek KKPR lewat OSS atau DPUPR Kabupaten Demak."
+        ),
+    },
+}
+
+# Sub-zona di peta pemda -> (zona, kode zona Permen ATR/BPN 14/2021). Aturan pertama yang cocok dipakai.
+# Kode 31000000/32000000 = lindung/budi daya, dipakai bila kode zona persisnya tidak tercantum di sumber.
+ZONA_ATURAN: list[tuple[str, str, str]] = [
+    (r"badan jalan", "Badan Jalan", "32010000"),
+    (r"non hijau", "Ruang Terbuka Non Hijau", "32000000"),
+    (r"^badan air|rt biru|ruang terbuka biru", "Badan Air", "31010000"),
+    (r"mangrove", "Ekosistem Mangrove", "31090000"),
+    (r"sempadan|perlindungan setempat", "Perlindungan Setempat", "31030000"),
+    (r"cagar budaya", "Cagar Budaya", "31000000"),
+    (r"hutan lindung", "Hutan Lindung", "31021000"),
+    (r"konservasi", "Konservasi", "31040000"),
+    (r"hutan produksi", "Hutan Produksi", "32020000"),
+    (r"\brth\b|taman|hutan kota|rimba kota|jalur hijau|pemakaman|ruang terbuka hijau", "Ruang Terbuka Hijau", "31031000"),
+    (r"militer|pertahanan", "Pertahanan dan Keamanan", "32130000"),
+    (r"\bipal\b|\bipam\b|persampahan|limbah|air minum|prasarana", "Prasarana Lingkungan", "32000000"),
+    (r"pembangkit|tenaga listrik", "Pembangkitan Tenaga Listrik", "32075000"),
+    (r"pertambangan|minyak dan gas", "Pertambangan dan Energi", "32070000"),
+    (r"industri", "Kawasan Peruntukan Industri", "32080000"),
+    (r"pergudangan", "Pergudangan", "32000000"),
+    (r"wisata", "Pariwisata", "32090000"),
+    (r"campuran|mix use", "Campuran", "32000000"),
+    (r"perumahan|permukiman", "Perumahan", "32103000"),
+    (r"perdagangan", "Perdagangan dan Jasa", "32112000"),
+    (r"kantor", "Perkantoran", "32113000"),
+    (r"\bspu\b|pelayanan umum|pendidikan|peribadatan|puskesmas|rumah sakit|olah raga|kesehatan", "Sarana Pelayanan Umum", "32104000"),
+    (r"terminal|transportasi|pelabuhan|bandar udara|stasiun", "Transportasi", "32120000"),
+    (r"tanaman pangan|hortikultura|pertanian|perkebunan", "Pertanian", "32040000"),
+    (r"perikanan|tambak", "Perikanan", "32050000"),
+]
+
+
+def kelompok_zona(nama: str) -> tuple[str, str]:
+    """Zona dan kode untuk satu sub-zona, mis. 'SPU Skala Kelurahan' -> ('Sarana Pelayanan Umum', '32104000')."""
+    for pola, zona, kode in ZONA_ATURAN:
+        if re.search(pola, nama, re.I):
+            return zona, kode
+    return "Zona lain", ""
 UBIN_DEM = [
     f"/vsicurl/https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S{la:02d}_00_E{lo:03d}_00_DEM/Copernicus_DSM_COG_10_S{la:02d}_00_E{lo:03d}_00_DEM.tif"
     # nama ubin = lintang selatan bulat ke atas (S07 = 6 sampai 7 LS) dan bujur bulat ke bawah
@@ -126,6 +243,13 @@ WARNA_RTRW = {
     "Pariwisata": "#ef8a7d",
     "Transportasi": "#8d8f9c",
     "Pertahanan dan Keamanan": "#6f7d3c",
+    # zona lain di peta pemda (RTRW Kota Semarang, RDTR Pekalongan dan Demak)
+    "Campuran": "#f29e4c",
+    "Pergudangan": "#a35d84",
+    "Cagar Budaya": "#a1887f",
+    "Ruang Terbuka Non Hijau": "#b9c49a",
+    "Prasarana Lingkungan": "#7d8597",
+    "Pertambangan dan Energi": "#8b6a4f",
 }
 WARNA_LAIN = "#c4a27c"
 
@@ -174,6 +298,66 @@ def unduh_rtrw() -> Path | None:
             raise SystemExit(f"Layanan RTRW galat: {str(d)[:300]}")
         return None
     tujuan.write_text(json.dumps(d), encoding="utf-8")
+    return tujuan
+
+
+def ambil_teks(url: str, params: dict, timeout: int = 600) -> str:
+    """GET dengan requests. Bila rantai sertifikat server tidak dikenal paket certifi (mis. penerbit
+    Let's Encrypt baru), ulangi dengan curl bawaan Windows yang memakai penyimpanan sertifikat sistem.
+    Sertifikat tetap diverifikasi. Galat sambungan sesaat dicoba ulang dua kali."""
+    try:
+        for coba in range(3):
+            try:
+                r = requests.get(url, params=params, headers=UA, timeout=(30, timeout))
+                r.raise_for_status()
+                return r.text
+            except (requests.ConnectionError, requests.Timeout) as e:
+                if isinstance(e, requests.exceptions.SSLError) or coba == 2:
+                    raise
+                time.sleep(10 * (coba + 1))
+        raise AssertionError("tidak tercapai")
+    except requests.exceptions.SSLError:
+        lengkap = requests.Request("GET", url, params=params).prepare().url
+        hasil = subprocess.run(
+            [r"C:\Windows\System32\curl.exe", "-sSf", "-m", str(timeout), "-A", UA["User-Agent"], lengkap],
+            capture_output=True, check=True,
+        )
+        return hasil.stdout.decode("utf-8")
+
+
+def unduh_wfs(sumber: dict, nama: str, per_halaman: int = 1000) -> Path | None:
+    """Semua fitur satu lapis WFS (GeoServer) sebagai GeoJSON dalam UTM wilayah, per halaman supaya respons
+    besar tidak terputus. Diminta dalam meter karena keluaran derajat dibulatkan server ke 4 desimal (sekitar
+    11 m), terlalu kasar untuk blok RDTR. None bila layanan menolak atau kosong."""
+    tujuan = KONTEKS / f"{nama}-utm{EPSG_UTM}.geojson"
+    if tujuan.exists():
+        return tujuan
+    fitur: list[dict] = []
+    while True:
+        p = {
+            "service": "WFS",
+            "version": "2.0.0",
+            "request": "GetFeature",
+            "typeNames": sumber["lapis"],
+            "outputFormat": "application/json",
+            "srsName": f"EPSG:{EPSG_UTM}",
+            "count": per_halaman,
+            "startIndex": len(fitur),
+        }
+        try:
+            d = json.loads(ambil_teks(sumber["wfs"], p))
+        except (requests.RequestException, subprocess.CalledProcessError, json.JSONDecodeError) as e:
+            print(f"  {sumber['lapis']}: layanan tidak bisa diakses ({type(e).__name__}: {str(e)[:160]})")
+            return None
+        fs = d.get("features") or []
+        fitur.extend(f for f in fs if f.get("geometry"))
+        if len(fs) < per_halaman:
+            break
+    if not fitur:
+        print(f"  {sumber['lapis']}: tidak ada fitur")
+        return None
+    tujuan.write_text(json.dumps({"type": "FeatureCollection", "features": fitur}), encoding="utf-8")
+    print(f"  {sumber['lapis']}: {len(fitur)} fitur diunduh", flush=True)
     return tujuan
 
 
@@ -236,8 +420,11 @@ def olah_rtrw(sumber: Path | None, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataF
             "skala": "",
             "sumber": [{"nama": f"File {sumber.name}", "catatan": "Diberikan lewat --rtrw. Lengkapi nama dan tahun Perda di README."}],
         }
+    elif WILAYAH in RTRW_KOTA:
+        return olah_wfs(RTRW_KOTA[WILAYAH], f"rtrw_kota_{WILAYAH}", kota)
     elif WILAYAH == "jakarta":
-        return olah_rdtr_dki(kota)
+        # pola ruang Jakarta yang terbuka hanya RDTR (lapis rdtr)
+        return None
     else:
         berkas = unduh_rtrw()
         if berkas is None:
@@ -263,9 +450,49 @@ def olah_rtrw(sumber: Path | None, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataF
     g["NAMOBJ"] = g["NAMOBJ"].fillna("Tanpa nama").astype(str).str.strip()
     g["KODKWS"] = g["KODKWS"].fillna("").astype(str)
     g = rapikan(g, kota, ["NAMOBJ", "KODKWS"], 15)
-    g["FUNGSI"] = np.where(g["KODKWS"].str.startswith("31"), "Lindung", np.where(g["KODKWS"].str.startswith("32"), "Budi daya", ""))
+    # RTRW provinsi sudah setingkat zona: zona = nama kelas
+    g["ZONA"] = g["NAMOBJ"]
+    g["FUNGSI"] = fungsi(g["KODKWS"])
     g["WARNA"] = g["NAMOBJ"].map(WARNA_RTRW).fillna(WARNA_LAIN)
     return g, meta
+
+
+def fungsi(kode: pd.Series) -> np.ndarray:
+    return np.where(kode.str.startswith("31"), "Lindung", np.where(kode.str.startswith("32"), "Budi daya", ""))
+
+
+def olah_wfs(sumber: dict, nama: str, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict] | None:
+    """Pola ruang rinci dari geoportal pemda: sub-zona dikelompokkan ke zona, Badan Jalan dibuang."""
+    berkas = unduh_wfs(sumber, nama)
+    if berkas is None:
+        return None
+    g = gpd.read_file(berkas).set_crs(EPSG_UTM, allow_override=True)
+    kolom = next((k for k in ("NAMOBJ", "namobj", "NAMZON", "namzon", "SUBZONA", "subzona", "ZONA", "zona") if k in g.columns), None)
+    if kolom is None:
+        raise SystemExit(f"{sumber['lapis']}: kolom nama zona tidak dikenal. Kolom yang ada: {list(g.columns)}")
+    g = g.rename(columns={kolom: "NAMOBJ"})[["NAMOBJ", "geometry"]]
+    g = g[g.geometry.notna()].copy()
+    g["NAMOBJ"] = g["NAMOBJ"].fillna("Tanpa nama").astype(str).str.strip()
+    zk = g["NAMOBJ"].map(kelompok_zona)
+    g["ZONA"] = zk.str[0]
+    g["KODKWS"] = zk.str[1]
+    lain = sorted(g.loc[g["ZONA"] == "Zona lain", "NAMOBJ"].unique())
+    if lain:
+        print(f"  sub-zona tanpa kelompok: {lain}")
+    g = g[g["ZONA"] != "Badan Jalan"]
+    g = rapikan(g, kota, ["ZONA", "NAMOBJ", "KODKWS"], sumber["toleransi"], luas_min_ha=sumber["luas_min_ha"], tutup_celah_m=sumber["celah_m"])
+    g["FUNGSI"] = fungsi(g["KODKWS"])
+    g["WARNA"] = g["ZONA"].map(WARNA_RTRW).fillna(WARNA_LAIN)
+    meta = {**sumber["meta"], "catatan": sumber["catatan"]}
+    return g, meta
+
+
+def olah_rdtr(kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict] | None:
+    if WILAYAH == "jakarta":
+        return olah_rdtr_dki(kota)
+    if WILAYAH in RDTR:
+        return olah_wfs(RDTR[WILAYAH], f"rdtr_{WILAYAH}", kota)
+    return None
 
 
 def unduh_rdtr_dki() -> Path:
@@ -303,7 +530,8 @@ def olah_rdtr_dki(kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]:
     g["KODKWS"] = g["kodzon"].astype("Int64").astype(str)
     g["NAMOBJ"] = g["kodzon"].map(ZONA_DKI).fillna("Zona lain")
     g = rapikan(g[["NAMOBJ", "KODKWS", "geometry"]], kota, ["NAMOBJ", "KODKWS"], 20, luas_min_ha=1, tutup_celah_m=10)
-    g["FUNGSI"] = np.where(g["KODKWS"].str.startswith("31"), "Lindung", "Budi daya")
+    g["ZONA"] = g["NAMOBJ"]
+    g["FUNGSI"] = fungsi(g["KODKWS"])
     g["WARNA"] = g["NAMOBJ"].map(WARNA_RTRW).fillna(WARNA_LAIN)
     meta = {
         "judul": "Rencana pola ruang RDTR DKI Jakarta 2022",
@@ -313,6 +541,10 @@ def olah_rdtr_dki(kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]:
             {"nama": "Peraturan Gubernur DKI Jakarta Nomor 31 Tahun 2022 tentang Rencana Detail Tata Ruang Wilayah Perencanaan Provinsi DKI Jakarta"},
             {"nama": "Data vektor: layanan ArcGIS DPMPTSP DKI Jakarta, Rencana Pola Ruang RDTR 2022", "url": URL_RDTR_DKI.removesuffix("/query")},
         ],
+        "catatan": (
+            "RDTR adalah rencana zona sampai tingkat blok dan menjadi dasar KKPR untuk izin bangunan. Di sini disederhanakan "
+            "dan Badan Jalan tidak ditampilkan. Untuk kepastian satu persil, cek KKPR di JAKI atau DPMPTSP DKI."
+        ),
     }
     return g, meta
 
@@ -463,13 +695,18 @@ def tulis(g: gpd.GeoDataFrame, nama: str, lapis: str, meta: dict, properti: dict
     }
     teks = json.dumps(keluaran, ensure_ascii=False, separators=(",", ":"))
     # 5 angka desimal (sekitar 1 m) sudah jauh lebih rinci dari skala sumbernya
-    import re
-
     teks = re.sub(r"(-?\d+\.\d{5})\d+", r"\1", teks)
     (KELUAR / f"{WILAYAH}-konteks-{lapis}.geojson").write_text(teks, encoding="utf-8")
     print(f"{lapis}: {len(fitur)} fitur, {len(teks) // 1024} KB, SHP di {SHP / f'{WILAYAH}-{nama}.shp'}")
     for s in stat:
         print(f"  {s['nama'][:34]:34} {s['luasKm2']:7.1f} km2  piksel {s['nPiksel']:6d}  median {s.get('median', '-')}  porsi >=4 cm {s.get('porsiTinggi', '-')}")
+
+
+def tulis_pola_ruang(g: gpd.GeoDataFrame, lapis: str, meta: dict) -> None:
+    """Fitur per sub-zona (nama) dengan zonanya; statistik laju per zona supaya legenda tetap ringkas."""
+    per_zona = g.dissolve(by="ZONA", as_index=False, aggfunc="first")
+    properti = {"kode": "KODKWS", "nama": "NAMOBJ", "zona": "ZONA", "fungsi": "FUNGSI", "warna": "WARNA"}
+    tulis(g, f"{lapis}-pola-ruang", lapis, meta, properti, statistik(per_zona, "ZONA", "KODKWS"))
 
 
 def main() -> None:
@@ -480,25 +717,34 @@ def main() -> None:
     KONTEKS.mkdir(parents=True, exist_ok=True)
     kota = kota_utm()
 
+    def hapus_lapis(lapis: str) -> None:
+        """Lapis yang tidak dibuat lagi: buang GeoJSON aplikasi dan SHP lamanya supaya tidak terbaca basi."""
+        (KELUAR / f"{WILAYAH}-konteks-{lapis}.geojson").unlink(missing_ok=True)
+        for f in SHP.glob(f"{WILAYAH}-{lapis}-pola-ruang.*"):
+            f.unlink()
+
     hasil_rtrw = olah_rtrw(a.rtrw, kota)
     if hasil_rtrw is None:
-        print("rtrw: tidak dibuat (layanan pola ruang provinsi yang terbuka tidak mencakup wilayah ini)")
-        (KELUAR / f"{WILAYAH}-konteks-rtrw.geojson").unlink(missing_ok=True)
+        print("rtrw: tidak dibuat (tidak ada layanan pola ruang RTRW terbuka yang mencakup wilayah ini)")
+        hapus_lapis("rtrw")
     else:
         rtrw, meta_rtrw = hasil_rtrw
         if a.rtrw:
             meta_rtrw["catatan"] = ""
-        elif WILAYAH == "jakarta":
-            meta_rtrw["catatan"] = (
-                "Pola ruang adalah rencana peruntukan lahan, bukan guna lahan saat ini. RDTR sudah rinci sampai blok, tetapi di sini disederhanakan "
-                "dan Badan Jalan tidak ditampilkan. Untuk kepastian satu persil, cek KKPR di JAKI atau DPMPTSP DKI."
-            )
-        else:
+        elif "catatan" not in meta_rtrw:
             meta_rtrw["catatan"] = (
                 "Pola ruang adalah rencana peruntukan lahan, bukan guna lahan saat ini. Skala provinsi cocok untuk gambaran kawasan, "
                 f"tidak untuk memastikan peruntukan satu persil. Untuk itu cek RDTR dan KKPR di dinas tata ruang {NAMA_WILAYAH} atau GISTARU."
             )
-        tulis(rtrw, "rtrw-pola-ruang", "rtrw", meta_rtrw, {"kode": "KODKWS", "nama": "NAMOBJ", "fungsi": "FUNGSI", "warna": "WARNA"}, statistik(rtrw, "NAMOBJ", "KODKWS"))
+        tulis_pola_ruang(rtrw, "rtrw", meta_rtrw)
+
+    hasil_rdtr = olah_rdtr(kota)
+    if hasil_rdtr is None:
+        print("rdtr: tidak dibuat (tidak ada RDTR terbuka untuk wilayah ini, atau layanannya sedang menolak)")
+        hapus_lapis("rdtr")
+    else:
+        rdtr, meta_rdtr = hasil_rdtr
+        tulis_pola_ruang(rdtr, "rdtr", meta_rdtr)
 
     hasil_geo = olah_geologi(a.geologi, kota)
     if hasil_geo is None:

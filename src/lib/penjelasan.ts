@@ -39,6 +39,15 @@ const POLA: { cocok: (kode: string, nama: string) => boolean; isi: PenjelasanPol
     },
   },
   {
+    cocok: (_k, n) => /campuran/i.test(n),
+    isi: {
+      golongan: 'Budi daya',
+      arti: 'Zona campuran: rumah, toko, dan kantor kecil berbaur dalam satu kawasan.',
+      hunian: 'terbatas',
+      untukRumah: 'Rumah tinggal umumnya boleh, sering bersama usaha. Kawasannya lebih ramai dan aturan intensitasnya bisa lebih tinggi daripada zona perumahan. Pastikan lewat KKPR.',
+    },
+  },
+  {
     cocok: (k, n) => k === '32112000' || /perdagangan/i.test(n),
     isi: {
       golongan: 'Budi daya',
@@ -84,6 +93,18 @@ const POLA: { cocok: (kode: string, nama: string) => boolean; isi: PenjelasanPol
       catatan:
         'Kawasan industri di pesisir sering memakai air tanah dalam jumlah besar. Penyedotan air tanah adalah salah satu pemicu utama ambles di pesisir utara Jawa.',
     },
+  },
+  {
+    cocok: (_k, n) => /pergudangan/i.test(n),
+    isi: { golongan: 'Budi daya', arti: 'Zona untuk gudang dan logistik, dengan lalu lintas truk.', hunian: 'tidak', untukRumah: TIDAK_HUNIAN },
+  },
+  {
+    cocok: (_k, n) => /prasarana|persampahan|limbah/i.test(n),
+    isi: { golongan: 'Budi daya', arti: 'Instalasi air minum, pengolahan air limbah, dan pengelolaan sampah.', hunian: 'tidak', untukRumah: TIDAK_HUNIAN },
+  },
+  {
+    cocok: (_k, n) => /non hijau/i.test(n),
+    isi: { golongan: 'Budi daya', arti: 'Lapangan, plaza, dan ruang terbuka berperkerasan.', hunian: 'tidak', untukRumah: 'Tidak untuk dibangun rumah.' },
   },
   {
     cocok: (k, n) => k === '32040000' || /pertanian/i.test(n),
@@ -144,7 +165,16 @@ const POLA: { cocok: (kode: string, nama: string) => boolean; isi: PenjelasanPol
   },
   {
     cocok: (k, n) => k === '31031000' || /ruang terbuka hijau/i.test(n),
-    isi: { golongan: 'Lindung', arti: 'Taman, hutan kota, dan jalur hijau.', hunian: 'tidak', untukRumah: 'Tidak boleh dibangun rumah.' },
+    isi: { golongan: 'Lindung', arti: 'Taman, hutan kota, jalur hijau, dan pemakaman.', hunian: 'tidak', untukRumah: 'Tidak boleh dibangun rumah.' },
+  },
+  {
+    cocok: (_k, n) => /cagar budaya/i.test(n),
+    isi: {
+      golongan: 'Lindung',
+      arti: 'Bangunan atau kawasan cagar budaya yang dilestarikan.',
+      hunian: 'terbatas',
+      untukRumah: 'Bangunan lama boleh dihuni, tetapi perubahan bentuk dan pembangunan baru dibatasi aturan pelestarian dan perlu izin khusus.',
+    },
   },
   {
     cocok: (k, n) => k === '31010000' || /badan air/i.test(n),
@@ -156,10 +186,26 @@ const POLA: { cocok: (kode: string, nama: string) => boolean; isi: PenjelasanPol
   },
 ]
 
-/** Penjelasan zona pola ruang. Kode mengikuti klasifikasi Permen ATR/BPN (31 = lindung, 32 = budi daya). */
+/** Penjelasan zona pola ruang. Kode mengikuti klasifikasi Permen ATR/BPN (31 = lindung, 32 = budi daya).
+ *  Untuk RDTR, berikan nama zona (mis. "Perumahan"), bukan sub-zona, supaya aturannya cocok. */
 export function penjelasanPolaRuang(kode: string, nama: string): PenjelasanPolaRuang | null {
   const k = String(kode ?? '')
   return POLA.find((p) => p.cocok(k, nama))?.isi ?? null
+}
+
+const SUBZONA: [RegExp, string][] = [
+  [/kepadatan (sangat )?tinggi/i, 'Kepadatan tinggi: kavling kecil dan rapat, halaman sempit, dan bangunan boleh lebih tinggi.'],
+  [/kepadatan sedang/i, 'Kepadatan sedang: kavling menengah dengan halaman yang cukup.'],
+  [/kepadatan (sangat )?rendah/i, 'Kepadatan rendah: kavling besar dengan lebih banyak ruang terbuka. Batas luas lantai dasar (KDB) lebih ketat.'],
+  [/skala (rw|lingkungan)/i, 'Skala lingkungan: melayani warga sekitar, setingkat RW.'],
+  [/skala kelurahan/i, 'Skala kelurahan: melayani satu kelurahan.'],
+  [/skala (kecamatan|bwk|swp)/i, 'Skala kecamatan atau bagian wilayah kota: lebih ramai dan menarik lalu lintas dari luar lingkungan.'],
+  [/skala (kota|wp|nas|reg)/i, 'Skala kota atau lebih luas: pusat kegiatan yang ramai dengan lalu lintas padat.'],
+]
+
+/** Arti sub-zona RDTR (kepadatan perumahan, skala layanan). null bila tidak ada keterangan khusus. */
+export function penjelasanSubzona(nama: string): string | null {
+  return SUBZONA.find(([p]) => p.test(nama))?.[1] ?? null
 }
 
 // ---------------------------------------------------------------- geologi

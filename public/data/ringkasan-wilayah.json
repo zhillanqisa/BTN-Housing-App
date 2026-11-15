@@ -99,8 +99,8 @@
    ],
    "lulusGerbang": true,
    "nKelurahan": 27,
-   "nKelurahanMemadai": 26,
-   "nKelurahanTinggi": 25,
+   "nKelurahanMemadai": 27,
+   "nKelurahanTinggi": 26,
    "tercepat": [
     {
      "nama": "Pasirkratonkramat",
@@ -120,14 +120,14 @@
    ],
    "piksel": {
     "dalamWilayah": 7212,
-    "terukur": 6025,
+    "terukur": 6067,
     "persenTerukur": 84,
-    "median": 6.89,
+    "median": 6.9,
     "p95": 9.6,
-    "maks": 11.1,
+    "maks": 11,
     "luasKm2": {
-     "min2": 38.3,
-     "min4": 35.1
+     "min2": 38.6,
+     "min4": 35.4
     }
    }
   },
