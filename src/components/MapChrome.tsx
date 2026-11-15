@@ -196,7 +196,7 @@ function LegendaMini({ onBuka }: { onBuka: () => void }) {
       type="button"
       onClick={onBuka}
       aria-label="Buka legenda dan lapis peta"
-      className="glass absolute left-3 top-[136px] z-10 flex h-9 max-w-[calc(100%-88px)] items-center gap-2 overflow-hidden whitespace-nowrap rounded-full px-3.5 text-[11.5px] font-semibold text-ink-2"
+      className="glass absolute left-3 top-[calc(136px+var(--geser-atas))] z-10 flex h-9 max-w-[calc(100%-88px)] items-center gap-2 overflow-hidden whitespace-nowrap rounded-full px-3.5 text-[11.5px] font-semibold text-ink-2"
     >
       {isi}
     </button>
@@ -315,7 +315,7 @@ export default function MapChrome() {
   if (kecil) {
     return (
       <>
-        <div className="glass absolute right-3 top-[136px] z-10 flex flex-col rounded-[16px] p-1">
+        <div className="glass absolute right-3 top-[calc(136px+var(--geser-atas))] z-10 flex flex-col rounded-[16px] p-1">
           <IconButton label="Legenda dan lapis peta" aktif={legendaBuka} onClick={() => setLegendaBuka(true)}>
             <Stack size={18} />
           </IconButton>
@@ -328,7 +328,7 @@ export default function MapChrome() {
         <LegendaMini onBuka={() => setLegendaBuka(true)} />
         {legendaBuka && <LembarLegenda onTutup={() => setLegendaBuka(false)} />}
         {pesan && (
-          <div className="pointer-events-none absolute inset-x-0 top-[184px] z-[30] flex justify-center px-16">
+          <div className="pointer-events-none absolute inset-x-0 top-[calc(184px+var(--geser-atas))] z-[30] flex justify-center px-16">
             <p role="status" className="pa-fade rounded-full bg-ink px-4 py-2 text-center text-[12.5px] font-semibold text-surface shadow-pop">
               {pesan}
             </p>

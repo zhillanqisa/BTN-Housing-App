@@ -12,7 +12,7 @@ import { fmt } from '../lib/format'
 import { mergeBBox, polygonsOf } from '../lib/geo'
 import { batasBlok, lukisGrid, nilaiDi, type Grid, type RGBA } from '../lib/grid'
 import { JENIS_LAPIS, konteksDi, LABEL_LAPIS, type JenisLapis, type LapisKonteks } from '../lib/konteks'
-import { layarKecil, PECAHAN_SEDANG } from '../lib/layar'
+import { geserAtasPx, layarKecil, PECAHAN_SEDANG } from '../lib/layar'
 import { binLaju, klasifikasi } from '../lib/risk'
 import { jembatanPeta, kawasanById, useApp } from '../lib/store'
 import { wilayahById, wilayahDiTitik } from '../lib/wilayah'
@@ -166,7 +166,8 @@ function gayaCadangan(tema: Tema): StyleSpecification {
 function bantalan(laporan = false): PaddingOptions {
   if (!layarKecil()) return { left: 440, top: 96, right: 76, bottom: 56 }
   const bawah = laporan ? Math.round(window.innerHeight * PECAHAN_SEDANG) : 230
-  return { left: 24, top: 150, right: 64, bottom: Math.min(bawah, window.innerHeight - 260) }
+  const atas = geserAtasPx()
+  return { left: 24, top: 150 + atas, right: 64, bottom: Math.min(bawah, window.innerHeight - 260 - atas) }
 }
 
 interface Ringkas {
@@ -664,7 +665,7 @@ export default function MapView({ aktif }: { aktif: boolean }) {
       {/* h-full, bukan absolute: CSS MapLibre memaksa position: relative pada kontainer */}
       <div ref={wadah} className="h-full w-full" aria-label={`Peta penurunan tanah ${wilayahById(wilayah)?.nama ?? ''}`} />
       {cadangan && aktif && (
-        <div className="pointer-events-none absolute inset-x-0 top-[150px] z-10 flex justify-center px-4 lg:top-[92px]">
+        <div className="pointer-events-none absolute inset-x-0 top-[calc(150px+var(--geser-atas))] z-10 flex justify-center px-4 lg:top-[92px]">
           <Notice className="pointer-events-auto max-w-[420px] shadow-pop">
             Peta dasar tidak termuat. Periksa koneksi internet. Data kawasan tetap tampil.
           </Notice>

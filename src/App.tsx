@@ -115,7 +115,7 @@ function LapisanPeta() {
   const kecil = useLayarKecil()
   return (
     <>
-      <div className="absolute inset-x-3 top-[76px] z-[11] lg:inset-x-auto lg:left-4 lg:top-[88px] lg:w-[408px]">
+      <div className="absolute inset-x-3 top-[calc(76px+var(--geser-atas))] z-[11] lg:inset-x-auto lg:left-4 lg:top-[88px] lg:w-[408px]">
         <SearchBox />
       </div>
 
@@ -227,7 +227,7 @@ export default function App() {
       {halaman === 'peta' ? (
         <LapisanPeta />
       ) : (
-        <main className="scroll-thin absolute inset-0 z-20 overflow-y-auto bg-bg pb-[calc(84px+env(safe-area-inset-bottom))] pt-[88px] lg:pb-0">
+        <main className="scroll-thin absolute inset-0 z-20 overflow-y-auto bg-bg pb-[calc(84px+env(safe-area-inset-bottom))] pt-[calc(88px+var(--geser-atas))] lg:pb-0">
           <Suspense
             fallback={
               <div className="mx-auto w-full max-w-[1240px] px-4 md:px-8">

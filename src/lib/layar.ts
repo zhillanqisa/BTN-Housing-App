@@ -40,3 +40,19 @@ export function useTinggiLayar(): number {
 
 /** Bagian lembar laporan yang terlihat pada posisi "sedang", sebagai pecahan tinggi layar. */
 export const PECAHAN_SEDANG = 0.56
+
+let probeAtas: HTMLDivElement | null = null
+
+/** Nilai --geser-atas (styles/app.css) dalam px: jarak tambahan dari tepi atas layar ponsel supaya
+ *  bilah atas tidak menabrak lubang kamera. 0 di desktop. Diukur lewat elemen tak terlihat karena
+ *  nilai env() hanya bisa dibaca setelah dihitung peramban. */
+export function geserAtasPx(): number {
+  if (typeof document === 'undefined') return 0
+  if (!probeAtas) {
+    probeAtas = document.createElement('div')
+    probeAtas.setAttribute('aria-hidden', 'true')
+    probeAtas.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;width:1px;height:var(--geser-atas);top:0;left:0'
+    document.body.appendChild(probeAtas)
+  }
+  return probeAtas.offsetHeight
+}

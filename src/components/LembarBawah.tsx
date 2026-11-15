@@ -4,7 +4,7 @@
 // tegak di mana pun pada lembar menyeret lembar. Pada posisi penuh, tarik ke bawah saat isi sudah di
 // puncak juga menyeret lembar turun. Gerak mendatar (mis. deret chip) dibiarkan ke peramban.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { PECAHAN_SEDANG, useTinggiLayar } from '../lib/layar'
+import { geserAtasPx, PECAHAN_SEDANG, useTinggiLayar } from '../lib/layar'
 import { cx } from '../ui/primitives'
 
 export type PosisiLembar = 'kecil' | 'sedang' | 'penuh'
@@ -62,7 +62,11 @@ export default function LembarBawah({ label, posisi, onPosisi, onTutup, gulirRef
   const baruSeret = useRef(0)
   const timerTutup = useRef(0)
 
-  const tinggiPenuh = Math.max(320, tinggiLayar - JARAK_ATAS_LEMBAR)
+  // jarak atas ikut --geser-atas, supaya lembar penuh tetap di bawah bilah atas yang menghindari lubang kamera.
+  // Diukur ulang hanya saat tinggi layar berubah (mis. putar layar), bukan tiap render saat diseret.
+  const [geserAtas, setGeserAtas] = useState(geserAtasPx)
+  useLayoutEffect(() => setGeserAtas(geserAtasPx()), [tinggiLayar])
+  const tinggiPenuh = Math.max(320, tinggiLayar - JARAK_ATAS_LEMBAR - geserAtas)
   const kecil = Math.min(tinggiIntip + aman, tinggiPenuh)
   const terlihat: Record<PosisiLembar, number> = {
     kecil,

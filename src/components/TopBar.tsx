@@ -23,7 +23,7 @@ export default function TopBar({ halaman }: { halaman: Halaman }) {
   const nBanding = useApp((s) => s.banding.length)
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-30 px-3 pt-3 lg:px-4 lg:pt-4">
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-30 px-3 pt-[calc(12px+var(--geser-atas))] lg:px-4 lg:pt-4">
       <div className="glass pointer-events-auto flex h-14 items-center gap-1.5 rounded-[22px] pl-3 pr-2">
         <button type="button" onClick={() => navigasi('peta')} className="flex shrink-0 items-center gap-2.5 rounded-[12px] pr-2" aria-label={`${APP.nama}, ke halaman peta`}>
           <Logo size={30} />

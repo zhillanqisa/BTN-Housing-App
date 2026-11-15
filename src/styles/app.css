@@ -295,6 +295,18 @@
 
 /* Ponsel: deret kartu contoh digeser dengan jari, tanpa bilah gulir. Atribusi peta pindah ke bawah
    kolom tombol kanan supaya tidak tertutup navigasi bawah dan lembar laporan. */
+/* Jarak tambahan dari tepi atas layar ponsel, supaya bilah atas tidak menabrak lubang kamera atau poni.
+   Halaman memakai viewport-fit=cover; bila perangkat melaporkan area aman, itu yang dipakai. Minimal 22px
+   untuk ponsel (dan mockup) yang tidak melaporkannya. Semua elemen yang diposisikan dari atas ikut bergeser. */
+:root {
+  --geser-atas: 0px;
+}
+@media (max-width: 1023.98px) {
+  :root {
+    --geser-atas: max(calc(env(safe-area-inset-top) - 6px), 22px);
+  }
+}
+
 @media (max-width: 1023.98px) {
   .hp-tanpa-gulir {
     scrollbar-width: none;
@@ -303,7 +315,7 @@
     display: none;
   }
   .maplibregl-ctrl-bottom-right {
-    top: 316px;
+    top: calc(316px + var(--geser-atas));
     right: 6px;
     bottom: auto;
   }
