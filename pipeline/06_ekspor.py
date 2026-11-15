@@ -71,6 +71,17 @@ LITERATUR = {
 }
 
 
+
+BULAN = ("Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
+
+
+def tahun_bulan(t: float, akhir: bool = False) -> str:
+    """Tahun desimal ke "Bln YYYY". akhir=True: batas eksklusif, jadi 2022.0 -> "Des 2021"."""
+    if akhir:
+        t -= 1e-6
+    y = int(t)
+    return f"{BULAN[min(11, int((t - y) * 12))]} {y}"
+
 def r(v: float, angka: int = 1) -> float:
     """Bulatkan seperti Math.round di JavaScript (setengah ke atas)."""
     k = 10**angka
@@ -189,10 +200,19 @@ def main() -> None:
         catatan.append(f"Laju diikat ke {acuan}, karena tidak ada stasiun GNSS stabil di dekat wilayah ini.")
     for s in validasi["gnss"]:
         if s["peran"] == "pembanding" and s.get("insar") is not None:
-            catatan.append(
-                f"Stasiun {s['stasiun']} ({PEMBANDING[s['stasiun']]['lokasi']}) adalah pembanding independen: GNSS {koma(s['gnss'], 2)} cm/tahun (2018-2021), "
-                f"InSAR {koma(s['insar'], 2)} cm/tahun (2020-{akhir[:4]})."
-            )
+            p = s.get("periodeSama")
+            if p:
+                catatan.append(
+                    f"Stasiun {s['stasiun']} ({PEMBANDING[s['stasiun']]['lokasi']}) adalah pembanding independen. Pada periode yang sama "
+                    f"({tahun_bulan(p['awal'])} sampai {tahun_bulan(p['akhir'], akhir=True)}), GNSS {koma(p['gnss'], 2)} dan InSAR {koma(p['insar'], 2)} cm/tahun. "
+                    f"Rerata seluruh catatan GNSS {koma(s['gnss'], 2)} cm/tahun, sedangkan InSAR 2020-{akhir[:4]} {koma(s['insar'], 2)} cm/tahun; "
+                    "bedanya menunjukkan laju di titik itu berubah dari waktu ke waktu."
+                )
+            else:
+                catatan.append(
+                    f"Stasiun {s['stasiun']} ({PEMBANDING[s['stasiun']]['lokasi']}) adalah pembanding independen: GNSS {koma(s['gnss'], 2)} cm/tahun (sampai 2021), "
+                    f"InSAR {koma(s['insar'], 2)} cm/tahun (2020-{akhir[:4]})."
+                )
     if bk:
         catatan.append(f"Perbukitan, yang semestinya stabil, terukur median {koma(bk['median'], 2)} cm/tahun (80% pikselnya antara {koma(bk['p10'], 2)} dan {koma(bk['p90'], 2)}).")
     catatan.append(f"{ribuan(satu)} dari {ribuan(n_valid)} piksel terukur hanya terlihat dari satu lintasan; di sana gerak dianggap vertikal seluruhnya.")

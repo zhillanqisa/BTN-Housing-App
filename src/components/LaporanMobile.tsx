@@ -135,7 +135,7 @@ export default function LaporanMobile() {
               { id: 'lap-proyeksi', label: 'Proyeksi' },
             ]
           : []),
-        ...(baris.length ? [{ id: 'lap-konteks', label: 'Konteks' }] : []),
+        { id: 'lap-konteks', label: 'Konteks' },
         { id: 'lap-langkah', label: 'Langkah' },
         { id: 'lap-sumber', label: 'Sumber' },
       ]
@@ -300,11 +300,9 @@ export default function LaporanMobile() {
             </>
           )}
 
-          {baris.length > 0 && (
-            <Bagian id="lap-konteks" judul="Konteks lokasi">
-              <DaftarKonteks baris={baris} laju={adaData ? k!.laju : null} />
-            </Bagian>
-          )}
+          <Bagian id="lap-konteks" judul="Konteks lokasi">
+            <DaftarKonteks baris={baris} laju={adaData ? k!.laju : null} lngLat={selection.lngLat} />
+          </Bagian>
 
           <Bagian id="lap-langkah" judul="Langkah berikutnya">
             <Langkah key={`${L.kunci}-${kategori}`} kategori={kategori!} judul={false} />

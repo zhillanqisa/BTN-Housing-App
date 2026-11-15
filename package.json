@@ -2,7 +2,7 @@
   "name": "pantau-ambles",
   "private": true,
   "version": "0.1.0",
-  "description": "PANTAU AMBLES - Cek Tanah Sebelum KPR. Demo web app: peta penurunan tanah per kelurahan, Laporan Ambles, dan Proyeksi Tenor untuk Kota Semarang.",
+  "description": "SubTen (Subsidence × Tenor) - Cek Tanah Sebelum KPR. Web app: laju penurunan tanah per titik dari InSAR Sentinel-1, Laporan Ambles, dan Proyeksi Tenor untuk kota pesisir utara Jawa.",
   "type": "module",
   "scripts": {
     "dev": "vite",

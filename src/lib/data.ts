@@ -64,7 +64,13 @@ function bacaProses(raw: unknown): ProsesMeta | undefined {
             const gnss = angka(g.gnss)
             const insar = angka(g.insar)
             const peran = g.peran === 'titik ikat' || g.peran === 'pembanding' ? g.peran : undefined
-            return gnss != null ? [{ stasiun: String(g.stasiun ?? ''), peran, gnss, insar }] : []
+            const ps = isObj(g.periodeSama) ? g.periodeSama : null
+            const psA = ps ? angka(ps.awal) : null
+            const psB = ps ? angka(ps.akhir) : null
+            const psG = ps ? angka(ps.gnss) : null
+            const psI = ps ? angka(ps.insar) : null
+            const periodeSama = psA != null && psB != null && psG != null && psI != null ? { awal: psA, akhir: psB, gnss: psG, insar: psI } : undefined
+            return gnss != null ? [{ stasiun: String(g.stasiun ?? ''), peran, gnss, insar, ...(periodeSama ? { periodeSama } : {}) }] : []
           })
         : undefined,
       lulus: v.lulus === true,

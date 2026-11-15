@@ -2,13 +2,16 @@
 // Status -> Riwayat -> Proyeksi Tenor -> Langkah berikutnya -> Sumber dan batasan.
 // Bila dataset punya grid, angkanya dari blok piksel di sekitar titik; bila tidak, rata-rata kelurahan.
 // Logika dan bagian isi di sini dipakai bersama panel desktop dan lembar ponsel (LaporanMobile).
-import { useState } from 'react'
-import { CircleNotch, DownloadSimple, LinkSimple, MapPin, Scales, X } from '@phosphor-icons/react'
+import { useState, type ReactNode } from 'react'
+import { ArrowSquareOut, Check, CircleNotch, DownloadSimple, LinkSimple, MapPin, Scales, X } from '@phosphor-icons/react'
 import { batasan, MAKS_BANDING, PRINSIP, TENORS } from '../lib/config'
 import { fmt, fmtKoordinat, fmtPeriode } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
 import { KODE_ALUVIUM, konteksDi, LABEL_LAPIS, statKelas, type FiturKonteks, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { kunciTitik, LABEL_TITIK } from '../lib/lokasi'
+import { polygonsOf } from '../lib/geo'
+import { LANGKAH_PERSIL, penampang, RADIUS_PETA_MINI_M, SKALA_DAYA, SKALA_HUNIAN } from '../lib/penampang'
+import { BHUMI, penjelasanGeologi, penjelasanPolaRuang, PERSIL_CATATAN, PERSIL_RINGKAS } from '../lib/penjelasan'
 import { kalimatStatus, klasifikasi, langkahBerikutnya, teksLaju } from '../lib/risk'
 import { navigasi } from '../lib/router'
 import { jembatanPeta, useApp, useBacaan } from '../lib/store'
@@ -16,6 +19,7 @@ import type { Kategori, Position } from '../lib/types'
 import { Button, IconButton, JudulBagian, KategoriBadge, Notice, Segmented, Skeleton } from '../ui/primitives'
 import HistoryChart from './HistoryChart'
 import TenorVisual from './TenorVisual'
+import { LangkahBernomor, PenampangTanah, StripSkala } from './VisualKonteks'
 
 /** Semua yang dibutuhkan tampilan laporan untuk lokasi terpilih. null bila belum ada pilihan. */
 export function useLaporan() {
@@ -29,6 +33,7 @@ export function useLaporan() {
   const banding = useApp((s) => s.banding)
   const toggleBanding = useApp((s) => s.toggleBanding)
   const tutup = useApp((s) => s.tutupLaporan)
+  const konteks = useApp((s) => s.konteks)
   const [sibuk, setSibuk] = useState(false)
   const [pesan, setPesan] = useState<string | null>(null)
 
@@ -57,7 +62,49 @@ export function useLaporan() {
     setSibuk(true)
     try {
       const { unduhLaporanPdf } = await import('../lib/pdf')
-      await unduhLaporanPdf({ kawasan: k, kategori, tenor, thresholds, meta, label: selection.label, lngLat: selection.lngLat, gambarPeta: jembatanPeta.ambilGambar?.() ?? null, titik, lebarBlokM: lebarBlok })
+      const lajuTerukur = k.memadai && k.laju != null ? k.laju : null
+      const konteksPdf = (['rtrw', 'geologi'] as const).flatMap((j) => {
+        const lapis = konteks[j]
+        const f = konteksDi(lapis, selection.lngLat)
+        if (!lapis || !f) return []
+        const sumber = `${lapis.meta.judul}${lapis.meta.skala ? `, skala ${lapis.meta.skala}` : ''}`
+        // fitur di sekitar titik untuk peta mini, yang terbesar digambar dulu
+        const [lon, lat] = selection.lngLat
+        const dLat = RADIUS_PETA_MINI_M / 110540
+        const dLon = RADIUS_PETA_MINI_M / (111320 * Math.cos((lat * Math.PI) / 180))
+        const luas = (b: number[]) => (b[2]! - b[0]!) * (b[3]! - b[1]!)
+        const peta = lapis.fitur
+          .filter((ft) => ft.bbox[0] <= lon + dLon && ft.bbox[2] >= lon - dLon && ft.bbox[1] <= lat + dLat && ft.bbox[3] >= lat - dLat)
+          .sort((p, q) => luas(q.bbox) - luas(p.bbox))
+          .map((ft) => ({ nama: ft.nama, warna: ft.warna, cincin: polygonsOf(ft.geometry).map((pg) => pg[0]!) }))
+        return [
+          {
+            jenis: j,
+            sumber,
+            kode: f.kode,
+            nama: f.nama,
+            fungsi: f.fungsi,
+            batuan: f.batuan,
+            sifat: f.sifat,
+            bacaan: j === 'geologi' ? kalimatGeologi(f.kode, lajuTerukur) : null,
+            warna: f.warna,
+            peta,
+          },
+        ]
+      })
+      await unduhLaporanPdf({
+        kawasan: k,
+        kategori,
+        tenor,
+        thresholds,
+        meta,
+        label: selection.label,
+        lngLat: selection.lngLat,
+        gambarPeta: jembatanPeta.ambilGambar?.() ?? null,
+        titik,
+        lebarBlokM: lebarBlok,
+        konteks: konteksPdf,
+      })
     } catch {
       kabari('PDF gagal dibuat. Coba lagi.')
     } finally {
@@ -157,12 +204,23 @@ function kalimatGeologi(kode: string, laju: number | null): string | null {
     : 'Sesuai pola umum: batuan padat seperti ini hampir tidak ambles.'
 }
 
+function Rincian({ judul, children }: { judul: string; children: ReactNode }) {
+  return (
+    <div className="mt-2.5">
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-ink-3">{judul}</div>
+      <div className="mt-0.5 text-[12.5px] leading-snug text-ink">{children}</div>
+    </div>
+  )
+}
+
 function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: LapisKonteks; f: FiturKonteks; laju: number | null }) {
   const lapisKonteks = useApp((s) => s.lapisKonteks)
   const setLapisKonteks = useApp((s) => s.setLapisKonteks)
   const st = statKelas(lapis, f.nama)
   const tampil = lapisKonteks === jenis
   const bacaan = jenis === 'geologi' ? kalimatGeologi(f.kode, laju) : null
+  const pr = jenis === 'rtrw' ? penjelasanPolaRuang(f.kode, f.nama) : null
+  const geo = jenis === 'geologi' ? penjelasanGeologi(f.kode) : null
   return (
     <div className="rounded-[14px] bg-surface-2 p-3">
       <div className="flex items-center justify-between gap-2">
@@ -179,12 +237,43 @@ function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: Lap
       <div className="mt-1 flex items-center gap-2">
         <span aria-hidden="true" className="size-3.5 shrink-0 rounded-[4px] ring-1 ring-black/10" style={{ background: f.warna }} />
         <span className="text-[14px] font-bold text-ink">{f.nama}</span>
-        {f.fungsi && <span className="text-[12px] text-ink-3">{f.fungsi}</span>}
+        <span className="text-[12px] text-ink-3">{f.fungsi ?? (pr ? `Kawasan ${pr.golongan.toLowerCase()}` : geo ? geo.umur.split(',')[0] : '')}</span>
       </div>
-      {f.batuan && <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{f.batuan}.</p>}
-      {f.sifat && <p className="mt-1 text-[12.5px] leading-snug text-ink">{f.sifat}</p>}
+
+      {pr && <StripSkala judul="Status untuk rumah tinggal" opsi={SKALA_HUNIAN} aktif={pr.hunian} waspada={pr.hunian === 'tidak'} />}
+      {geo && (
+        <>
+          <StripSkala judul="Kerentanan memadat" opsi={SKALA_DAYA} aktif={geo.daya} waspada={geo.daya === 'lunak'} />
+          <PenampangTanah data={penampang(geo.daya, f.warna, f.nama)} />
+        </>
+      )}
+
+      {f.batuan && <p className="mt-2.5 text-[12.5px] leading-snug text-ink-2">{f.batuan}.</p>}
       {bacaan && <p className="mt-1 text-[12.5px] font-semibold leading-snug text-ink">{bacaan}</p>}
-      <p className="mt-1.5 text-[11.5px] leading-snug text-ink-3">
+      {pr && (
+        <>
+          <Rincian judul="Artinya">{pr.arti}</Rincian>
+          <Rincian judul="Untuk membeli rumah">{pr.untukRumah}</Rincian>
+          {pr.catatan && <Rincian judul="Kaitan dengan ambles">{pr.catatan}</Rincian>}
+        </>
+      )}
+      {geo && (
+        <>
+          <Rincian judul="Kaitan dengan ambles">{geo.ambles}</Rincian>
+          <Rincian judul="Untuk bangunan">{geo.bangunan}</Rincian>
+          <Rincian judul="Tanyakan ke penjual">
+            <ul className="mt-1 space-y-1">
+              {geo.tanyakan.map((t) => (
+                <li key={t} className="flex gap-2">
+                  <span aria-hidden="true" className="mt-[3px] size-3.5 shrink-0 rounded-[4px] border-[1.5px] border-ink-3" />
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </Rincian>
+        </>
+      )}
+      <p className="mt-2.5 text-[11.5px] leading-snug text-ink-3">
         {st?.median != null && `Median laju kelas ini di seluruh wilayah ${fmt(Math.max(0, st.median), 1)} cm/tahun dari ${fmt(st.nPiksel)} piksel. `}
         {lapis.meta.jenis === 'perkiraan' ? 'Batasnya perkiraan dari bentuk lahan, bukan peta geologi resmi.' : `${lapis.meta.judul}${lapis.meta.skala ? `, skala ${lapis.meta.skala}` : ''}.`}
       </p>
@@ -202,28 +291,75 @@ export function useBarisKonteks(lngLat: Position) {
   })
 }
 
-export function DaftarKonteks({ baris, laju }: { baris: ReturnType<typeof useBarisKonteks>; laju: number | null }) {
+/** Batas persil: tautan ke BHUMI ATR/BPN dengan koordinat titik yang disalin. */
+export function KartuPersil({ lngLat }: { lngLat: Position }) {
+  const [tersalin, setTersalin] = useState(false)
+  const koordinat = `${lngLat[1].toFixed(6)}, ${lngLat[0].toFixed(6)}`
+  const salin = async () => {
+    try {
+      await navigator.clipboard.writeText(koordinat)
+      setTersalin(true)
+      window.setTimeout(() => setTersalin(false), 2200)
+    } catch {
+      /* papan klip tidak tersedia: koordinat tetap terlihat untuk disalin manual */
+    }
+  }
+  return (
+    <div className="rounded-[14px] bg-surface-2 p-3">
+      <span className="text-[11.5px] font-semibold text-ink-3">Batas persil dan sertifikat</span>
+      <p className="mt-1 text-[12.5px] leading-snug text-ink">{PERSIL_RINGKAS}</p>
+      <LangkahBernomor langkah={LANGKAH_PERSIL} />
+      <p className="mt-2.5 font-mono text-[11.5px] text-ink-2">{koordinat}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <a
+          href={BHUMI.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => void salin()}
+          className="inline-flex h-9 items-center gap-1.5 rounded-[12px] bg-ink px-3 text-[12.5px] font-semibold text-surface transition-opacity hover:opacity-90"
+        >
+          Buka {BHUMI.nama}
+          <ArrowSquareOut size={14} aria-hidden="true" />
+        </a>
+        <button
+          type="button"
+          onClick={() => void salin()}
+          className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-line-2 bg-surface px-3 text-[12.5px] font-semibold text-ink hover:bg-surface-2"
+        >
+          {tersalin ? <Check size={14} weight="bold" aria-hidden="true" /> : null}
+          {tersalin ? 'Koordinat tersalin' : 'Salin koordinat'}
+        </button>
+      </div>
+      <p className="mt-2 text-[11.5px] leading-snug text-ink-3">{PERSIL_CATATAN}</p>
+    </div>
+  )
+}
+
+export function DaftarKonteks({ baris, laju, lngLat }: { baris: ReturnType<typeof useBarisKonteks>; laju: number | null; lngLat: Position }) {
   return (
     <>
       <div className="space-y-2">
         {baris.map(({ j, lapis, f }) => (
           <BarisKonteks key={j} jenis={j} lapis={lapis} f={f} laju={laju} />
         ))}
+        <KartuPersil lngLat={lngLat} />
       </div>
-      <p className="mt-2 text-[11.5px] leading-snug text-ink-3">Konteks membantu membaca angka, tetapi tidak mengubah kategori. Kategori tetap hanya dari laju yang terukur.</p>
+      <p className="mt-2 text-[11.5px] leading-snug text-ink-3">
+        Konteks membantu membaca angka, tetapi tidak mengubah kategori. Kategori tetap hanya dari laju yang terukur. Penjelasan tata ruang dan geologi adalah panduan umum: kepastian
+        satu persil ada di KKPR, PBG, sertifikat, dan penyelidikan tanah.
+      </p>
     </>
   )
 }
 
-/** Kelurahan, pola ruang, dan geologi di titik terpilih. */
+/** Pola ruang, geologi, dan persil di titik terpilih. */
 function KonteksLokasi({ lngLat, laju }: { lngLat: Position; laju: number | null }) {
   const baris = useBarisKonteks(lngLat)
-  if (!baris.length) return null
   return (
     <div className="border-t border-line pt-4">
       <JudulBagian>Konteks lokasi</JudulBagian>
       <div className="mt-2">
-        <DaftarKonteks baris={baris} laju={laju} />
+        <DaftarKonteks baris={baris} laju={laju} lngLat={lngLat} />
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-// Bangun DATA DEMO ILUSTRATIF untuk PANTAU AMBLES.
+// Bangun DATA DEMO ILUSTRATIF untuk SubTen.
 //
 // PENTING: angka laju di sini BUKAN hasil pengukuran. Ini model ilustratif yang
 // meniru pola umum dari publikasi (makin ke utara dan timur makin cepat,

@@ -58,13 +58,23 @@ TURUNAN_TROPOSFER = (
 )
 
 
-def konfigurasi(lintasan: str, buang_tanggal: list[str], tropo: bool = TROPOSFER == "bukit", ref: tuple[float, float] = CSEM_LALO) -> str:
+def konfigurasi(
+    lintasan: str,
+    buang_tanggal: list[str],
+    tropo: bool = TROPOSFER == "bukit",
+    ref: tuple[float, float] = CSEM_LALO,
+    buang_pasangan: list[str] | None = None,
+) -> str:
     d = dir_lintasan(lintasan).as_posix()
     lat, lon = ref
     buang = ",".join(buang_tanggal) if buang_tanggal else "no"
+    buang12 = ",".join(buang_pasangan) if buang_pasangan else "no"
     return f"""# Konfigurasi MintPy untuk PANTAU AMBLES, lintasan {lintasan}. Dibuat oleh pipeline/04_mintpy.py.
 # Citra rusak (semua interferogramnya nyaris tanpa piksel tersambung), dicari otomatis oleh 04_mintpy.py.
 mintpy.network.excludeDate = {buang}
+# Pasangan yang baseline tegak lurusnya tidak terhitung di produk HyP3 ("Baseline: nan").
+# Nilai NaN membuat inversi baseline MintPy gagal (SVD tidak konvergen), jadi pasangan ini dibuang.
+mintpy.network.excludeDate12 = {buang12}
 # Pasangan lebih lama dari ini tidak dipakai inversi (umum.py: maks_hari_pasangan).
 mintpy.network.tempBaseMax = {MAKS_HARI_PASANGAN or 'auto'}
 
@@ -120,7 +130,15 @@ def tanggal_rusak(kerja: Path) -> list[str]:
     return sorted(t for t, f in terbaik.items() if f < MIN_TERSAMBUNG)
 
 
-def referensi_andal(kerja: Path, buang_tanggal: list[str]) -> tuple[float, float]:
+def pasangan_tanpa_baseline(kerja: Path) -> list[str]:
+    """Pasangan (YYYYMMDD_YYYYMMDD) yang baseline tegak lurusnya bukan bilangan hingga."""
+    with h5py.File(kerja / "inputs" / "ifgramStack.h5", "r") as h:
+        bperp = h["bperp"][:]
+        pasangan = [f"{a.decode()}_{b.decode()}" for a, b in h["date"][:]]
+    return [p for p, b in zip(pasangan, bperp) if not np.isfinite(b)]
+
+
+def referensi_andal(kerja: Path, buang_tanggal: list[str], buang_pasangan: list[str] = ()) -> tuple[float, float]:
     """Titik acuan: piksel stasiun bila tersambung di semua interferogram, bila tidak piksel andal terdekat.
 
     Andal = komponen tersambung bukan nol di semua interferogram yang dipakai (syarat masker
@@ -130,7 +148,7 @@ def referensi_andal(kerja: Path, buang_tanggal: list[str]) -> tuple[float, float
     with h5py.File(kerja / "inputs" / "ifgramStack.h5", "r") as h:
         at = dict(h.attrs)
         pasangan = [(a.decode(), b.decode()) for a, b in h["date"][:]]
-        pakai = [i for i, (a, b) in enumerate(pasangan) if a not in buang_tanggal and b not in buang_tanggal]
+        pakai = [i for i, (a, b) in enumerate(pasangan) if a not in buang_tanggal and b not in buang_tanggal and f"{a}_{b}" not in buang_pasangan]
         ny, nx = h["connectComponent"].shape[1:]
         sambung = np.ones((ny, nx), bool)
         koh = np.zeros((ny, nx), np.float64)
@@ -189,8 +207,10 @@ def main() -> None:
     jalankan(["mintpy.cli.smallbaselineApp", str(cfg), "--dostep", "load_data"], kerja)
     rusak = tanggal_rusak(kerja)
     print(f"Citra rusak yang dibuang: {', '.join(rusak) if rusak else 'tidak ada'}", flush=True)
-    ref = referensi_andal(kerja, rusak)
-    cfg.write_text(konfigurasi(a.lintasan, rusak, ref=ref), encoding="utf-8")
+    tanpa_bl = pasangan_tanpa_baseline(kerja)
+    print(f"Pasangan tanpa baseline yang dibuang: {', '.join(tanpa_bl) if tanpa_bl else 'tidak ada'}", flush=True)
+    ref = referensi_andal(kerja, rusak, tanpa_bl)
+    cfg.write_text(konfigurasi(a.lintasan, rusak, ref=ref, buang_pasangan=tanpa_bl), encoding="utf-8")
     jalankan(["mintpy.cli.smallbaselineApp", str(cfg), "--start", "modify_network", "--end", "correct_ionosphere"], kerja)
 
     for nama in (*TURUNAN_TROPOSFER, "timeseries_demErr.h5"):
@@ -210,7 +230,7 @@ def main() -> None:
     else:
         print("Wilayah datar: koreksi troposfer korelasi-ketinggian tidak dipakai.", flush=True)
     if not pakai_tropo:
-        cfg.write_text(konfigurasi(a.lintasan, rusak, tropo=False, ref=ref), encoding="utf-8")
+        cfg.write_text(konfigurasi(a.lintasan, rusak, tropo=False, ref=ref, buang_pasangan=tanpa_bl), encoding="utf-8")
 
     jalankan(["mintpy.cli.smallbaselineApp", str(cfg), "--start", "deramp"], kerja)
 

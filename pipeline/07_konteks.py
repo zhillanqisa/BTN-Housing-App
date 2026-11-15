@@ -146,7 +146,12 @@ GEOLOGI = {
 
 
 # ---------------------------------------------------------------- unduh
-def unduh_rtrw() -> Path:
+def unduh_rtrw() -> Path | None:
+    """Pola ruang RTRW Provinsi Jawa Tengah 2024. None bila layanan tidak punya fitur di kotak wilayah ini.
+
+    Layanan provinsi yang terbuka hanya memuat Kendal, Semarang, Demak, dan Jepara. Untuk wilayah lain
+    (mis. Kota Pekalongan) lapis pola ruang tidak dibuat sampai ada sumber resmi yang terbuka.
+    """
     tujuan = KONTEKS / "rtrw_prov_jateng_2024.geojson"
     if tujuan.exists():
         return tujuan
@@ -165,7 +170,9 @@ def unduh_rtrw() -> Path:
     r.raise_for_status()
     d = r.json()
     if not d.get("features"):
-        raise SystemExit(f"Layanan RTRW tidak mengembalikan fitur: {str(d)[:300]}")
+        if "error" in d:
+            raise SystemExit(f"Layanan RTRW galat: {str(d)[:300]}")
+        return None
     tujuan.write_text(json.dumps(d), encoding="utf-8")
     return tujuan
 
@@ -216,7 +223,7 @@ def rapikan(gdf: gpd.GeoDataFrame, kota: gpd.GeoDataFrame, kolom: list[str], tol
     return g[~g.geometry.is_empty]
 
 
-def olah_rtrw(sumber: Path | None, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]:
+def olah_rtrw(sumber: Path | None, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict] | None:
     if sumber:
         g = gpd.read_file(sumber)
         if "NAMOBJ" not in g.columns:
@@ -232,7 +239,10 @@ def olah_rtrw(sumber: Path | None, kota: gpd.GeoDataFrame) -> tuple[gpd.GeoDataF
     elif WILAYAH == "jakarta":
         return olah_rdtr_dki(kota)
     else:
-        g = gpd.read_file(unduh_rtrw())
+        berkas = unduh_rtrw()
+        if berkas is None:
+            return None
+        g = gpd.read_file(berkas)
         meta = {
             "judul": "Pola ruang RTRW Provinsi Jawa Tengah 2024-2044",
             "jenis": "resmi",
@@ -470,20 +480,25 @@ def main() -> None:
     KONTEKS.mkdir(parents=True, exist_ok=True)
     kota = kota_utm()
 
-    rtrw, meta_rtrw = olah_rtrw(a.rtrw, kota)
-    if a.rtrw:
-        meta_rtrw["catatan"] = ""
-    elif WILAYAH == "jakarta":
-        meta_rtrw["catatan"] = (
-            "Pola ruang adalah rencana peruntukan lahan, bukan guna lahan saat ini. RDTR sudah rinci sampai blok, tetapi di sini disederhanakan "
-            "dan Badan Jalan tidak ditampilkan. Untuk kepastian satu persil, cek KKPR di JAKI atau DPMPTSP DKI."
-        )
+    hasil_rtrw = olah_rtrw(a.rtrw, kota)
+    if hasil_rtrw is None:
+        print("rtrw: tidak dibuat (layanan pola ruang provinsi yang terbuka tidak mencakup wilayah ini)")
+        (KELUAR / f"{WILAYAH}-konteks-rtrw.geojson").unlink(missing_ok=True)
     else:
-        meta_rtrw["catatan"] = (
-            "Pola ruang adalah rencana peruntukan lahan, bukan guna lahan saat ini. Skala provinsi cocok untuk gambaran kawasan, "
-            f"tidak untuk memastikan peruntukan satu persil. Untuk itu cek RDTR dan KKPR di dinas tata ruang {NAMA_WILAYAH} atau GISTARU."
-        )
-    tulis(rtrw, "rtrw-pola-ruang", "rtrw", meta_rtrw, {"kode": "KODKWS", "nama": "NAMOBJ", "fungsi": "FUNGSI", "warna": "WARNA"}, statistik(rtrw, "NAMOBJ", "KODKWS"))
+        rtrw, meta_rtrw = hasil_rtrw
+        if a.rtrw:
+            meta_rtrw["catatan"] = ""
+        elif WILAYAH == "jakarta":
+            meta_rtrw["catatan"] = (
+                "Pola ruang adalah rencana peruntukan lahan, bukan guna lahan saat ini. RDTR sudah rinci sampai blok, tetapi di sini disederhanakan "
+                "dan Badan Jalan tidak ditampilkan. Untuk kepastian satu persil, cek KKPR di JAKI atau DPMPTSP DKI."
+            )
+        else:
+            meta_rtrw["catatan"] = (
+                "Pola ruang adalah rencana peruntukan lahan, bukan guna lahan saat ini. Skala provinsi cocok untuk gambaran kawasan, "
+                f"tidak untuk memastikan peruntukan satu persil. Untuk itu cek RDTR dan KKPR di dinas tata ruang {NAMA_WILAYAH} atau GISTARU."
+            )
+        tulis(rtrw, "rtrw-pola-ruang", "rtrw", meta_rtrw, {"kode": "KODKWS", "nama": "NAMOBJ", "fungsi": "FUNGSI", "warna": "WARNA"}, statistik(rtrw, "NAMOBJ", "KODKWS"))
 
     hasil_geo = olah_geologi(a.geologi, kota)
     if hasil_geo is None:

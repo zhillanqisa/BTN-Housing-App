@@ -1,4 +1,6 @@
-# PANTAU AMBLES
+# SubTen
+
+**Subsidence × Tenor.** Nama sebelumnya: PANTAU AMBLES.
 
 **Cek Tanah Sebelum KPR.** Web app untuk melihat laju penurunan tanah di sekitar sebuah titik di kota pesisir utara Jawa yang ambles (Semarang, Jakarta, Pekalongan, Demak) dan proyeksinya selama masa cicilan KPR (Proyeksi Tenor). Dibuat untuk BTN Housingpreneur Batch 3, kategori Housing Innovation.
 
@@ -17,8 +19,8 @@ Pilih wilayah di bilah atas atau di kartu awal. Tautan menyimpan wilayahnya (`#/
 | Wilayah | Data | Piksel terukur | Antarlintasan (RMSE) | Pembanding GNSS | Geologi | Pola ruang |
 |---|---|---|---|---|---|---|
 | Kota Semarang | 1.433 interferogram | 82% | 0,34 cm/tahun | CSEM (titik ikat) | Lembar Magelang dan Semarang | RTRW Prov. Jateng 2024-2044 |
-| DKI Jakarta | 1.056 interferogram | 95% | 0,45 cm/tahun | CBTU (titik ikat), CJKT selisih 0,41, CTGR selisih 0,14 cm/tahun | Lembar Jakarta dan Kepulauan Seribu | RDTR DKI 2022 |
-| Kota Pekalongan | sedang diolah | | | CPKL (pembanding) | Lembar Banjarnegara dan Pekalongan | RTRW Prov. Jateng 2024-2044 |
+| DKI Jakarta | 1.056 interferogram | 95% | 0,45 cm/tahun | CBTU (titik ikat); periode sama 2020-2021: CJKT selisih 0,36, CTGR selisih 0,87 cm/tahun | Lembar Jakarta dan Kepulauan Seribu | RDTR DKI 2022 |
+| Kota Pekalongan | 1.022 interferogram (sementara, 64 descending masih antre) | 84% | 0,69 cm/tahun | CPKL (pembanding); periode sama 2020-2021: GNSS dan InSAR sama-sama 10,0 cm/tahun | Lembar Banjarnegara dan Pekalongan | tidak tersedia terbuka |
 | Kabupaten Demak | sedang diolah | | | CSEM (titik ikat) | Lembar Kudus dan Salatiga | RTRW Prov. Jateng 2024-2044 |
 
 Dashboard punya kartu **Perbandingan wilayah pesisir** (luas yang turun minimal 4 cm/tahun, kelurahan berkategori tinggi, kelurahan tercepat, gerbang mutu), dibaca dari `public/data/ringkasan-wilayah.json` yang ditulis `node scripts/ringkasan-wilayah.mjs`.
@@ -160,7 +162,9 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 
 | Lapis | Sumber saat ini | Catatan |
 |---|---|---|
-| Pola ruang (Semarang, Pekalongan, Demak) | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000. RTRW kota/kabupaten yang rinci tidak bisa diambil pada 14 November 2026 |
+| Pola ruang (Semarang, Demak) | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000. RTRW kota/kabupaten yang rinci tidak bisa diambil pada 14 November 2026 |
+| Pola ruang (Pekalongan) | Belum ada | Layanan provinsi yang terbuka hanya memuat Kendal, Semarang, Demak, dan Jepara; RTRW Kota Pekalongan belum ada dari sumber resmi yang terbuka (dicek 15 November 2026) |
+| Persil (bidang tanah) | BHUMI ATR/BPN (bhumi.atrbpn.go.id/peta), ditautkan dari laporan bersama koordinat titik | BHUMI tidak menyediakan layanan peta terbuka untuk aplikasi lain dan dilindungi firewall serta reCAPTCHA, jadi batas persil tidak ditampilkan langsung (dicek 15 November 2026) |
 | Pola ruang (Jakarta) | RDTR DKI Jakarta 2022 (Pergub Nomor 31 Tahun 2022), layanan peta publik DPMPTSP DKI | Rinci sampai blok. Badan Jalan tidak ditampilkan; celah jalan antarblok ditutup supaya peta ringan |
 | Geologi (Semarang) | Peta Geologi Lembar Magelang dan Semarang 1:100.000 (Thanden dkk. 1996), didigitasi dengan `pipeline/07a_digitasi_geologi.py` | 7 satuan. Batas Aluvium cocok 87% dengan kaki bukit pada DEM tanpa digeser |
 | Geologi (Jakarta, Pekalongan, Demak) | Lembar Jakarta dan Kepulauan Seribu (Turkandi dkk. 1992), Banjarnegara dan Pekalongan (Condon dkk. 1996), Kudus (Suwarti dan Wikarno 1992), dan Salatiga (Sukardi dan Budhitrisna 1992); didigitasi dengan `pipeline/07b_geologi_lembar.py` | Warna satuan diambil dari kotak legenda lembar itu sendiri. Ketelitian batas sekitar 100 sampai 200 m |

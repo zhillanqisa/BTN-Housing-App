@@ -5,7 +5,7 @@ import { APP } from '../lib/config'
 import { navigasi } from '../lib/router'
 import { useApp } from '../lib/store'
 import type { Halaman } from '../lib/types'
-import { cx, IconButton, Logo } from '../ui/primitives'
+import { cx, IconButton, Logo, Wordmark } from '../ui/primitives'
 import PilihWilayah from './PilihWilayah'
 
 /** Halaman aplikasi. singkat = label di navigasi bawah ponsel (NavBawah). */
@@ -27,7 +27,7 @@ export default function TopBar({ halaman }: { halaman: Halaman }) {
       <div className="glass pointer-events-auto flex h-14 items-center gap-1.5 rounded-[22px] pl-3 pr-2">
         <button type="button" onClick={() => navigasi('peta')} className="flex shrink-0 items-center gap-2.5 rounded-[12px] pr-2" aria-label={`${APP.nama}, ke halaman peta`}>
           <Logo size={30} />
-          <span className="hidden text-[14px] font-extrabold tracking-tight text-ink min-[430px]:block lg:text-[15px]">{APP.nama}</span>
+          <Wordmark className="text-[16px] lg:text-[16.5px]" />
         </button>
 
         <div className="flex-1 lg:hidden" />

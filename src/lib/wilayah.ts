@@ -1,4 +1,4 @@
-// Wilayah yang dicakup PANTAU AMBLES. Tiap wilayah punya berkas data sendiri di public/data:
+// Wilayah yang dicakup SubTen. Tiap wilayah punya berkas data sendiri di public/data:
 //   <id>-kawasan.geojson, <id>-grid.json (+ .bin), <id>-konteks-rtrw.geojson, <id>-konteks-geologi.geojson
 // Ditulis oleh pipeline/06_ekspor.py dan pipeline/07_konteks.py dengan PA_WILAYAH=<id>.
 import type { BBox, Position } from './types'
@@ -107,7 +107,7 @@ export const DAFTAR_WILAYAH: Wilayah[] = [
     bbox: [109.642, -6.936, 109.715, -6.852],
     viewbox: '109.63,-6.84,109.72,-6.94',
     tempat: [
-      { label: 'Panjang Wetan', lngLat: [109.68887, -6.8681], jenis: 'kelurahan', sorotan: true },
+      { label: 'Panjang Wetan', lngLat: [109.68177, -6.86938], jenis: 'kelurahan', sorotan: true },
       { label: 'Bandengan', lngLat: [109.66319, -6.87168], jenis: 'kelurahan', sorotan: true },
       { label: 'Pasirkratonkramat', lngLat: [109.65724, -6.88415], jenis: 'kelurahan', sorotan: true },
       { label: 'Degayu', lngLat: [109.70358, -6.88552], jenis: 'kelurahan', sorotan: true },

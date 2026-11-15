@@ -105,7 +105,12 @@ def olah_job(job, lintasan: str, kotak, unduhan: Path) -> str:
         return "lewati"
     zip_path = unduhan / berkas
     if not zip_path.exists():
-        zip_path = job.download_files(unduhan)[0]
+        try:
+            zip_path = job.download_files(unduhan)[0]
+        except Exception:
+            # unduhan terputus meninggalkan zip setengah jadi: hapus supaya putaran berikut mengunduh ulang
+            (unduhan / berkas).unlink(missing_ok=True)
+            raise
     sementara = folder.with_name(folder.name + ".tmp")
     shutil.rmtree(sementara, ignore_errors=True)
     sementara.mkdir(parents=True)
@@ -128,6 +133,8 @@ def olah_job(job, lintasan: str, kotak, unduhan: Path) -> str:
         sementara.rename(folder)
     except Exception:
         shutil.rmtree(sementara, ignore_errors=True)
+        # zip yang tidak terbaca (mis. sisa unduhan terputus) dihapus dan diunduh ulang di putaran berikut
+        zip_path.unlink(missing_ok=True)
         raise
     zip_path.unlink()
     return "baru"

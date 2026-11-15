@@ -3,7 +3,9 @@
 import type { Kategori, Position, Tenor, Thresholds, Tema } from './types'
 
 export const APP = {
-  nama: 'PANTAU AMBLES',
+  nama: 'SubTen',
+  /** Sub(sidence) x Ten(or): penurunan tanah dibaca sepanjang masa cicilan. */
+  kepanjangan: 'Subsidence × Tenor',
   tagline: 'Cek Tanah Sebelum KPR',
   wilayah: 'Kota Semarang',
 } as const

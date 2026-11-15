@@ -30,9 +30,22 @@ node scripts/ringkasan-wilayah.mjs                         # kartu perbandingan 
 | Interferogram | 698 ascending (205 citra), 358 descending (110 citra) |
 | Piksel DKI terukur | 95% (96.459 dari 101.479) |
 | Selisih ascending dan descending | RMSE 0,45 cm/tahun, bias 0,42, korelasi 0,954 |
-| GNSS CJKT (pembanding, Jakarta Utara) | GNSS 0,51, InSAR 0,92 cm/tahun |
-| GNSS CTGR (pembanding, Tangerang) | GNSS 0,08, InSAR 0,22 cm/tahun |
+| GNSS CJKT (pembanding, Jakarta Utara) | periode sama 2020-2021: GNSS 0,28, InSAR 0,64 cm/tahun (seluruh catatan: GNSS 0,51, InSAR 2020-2026 0,92) |
+| GNSS CTGR (pembanding, Tangerang) | periode sama 2020-2021: GNSS -0,18, InSAR 0,69 cm/tahun (seluruh catatan: GNSS 0,08, InSAR 0,22) |
 | Laju tertinggi | 7,9 cm/tahun per piksel (Muara Angke); kelurahan tertinggi Pluit dan Kamal Muara 1,9 cm/tahun |
+| Gerbang mutu | lulus |
+
+### Hasil Pekalongan (15 November 2026, sementara)
+
+Dihitung dari 512 interferogram ascending dan 510 dari 575 descending; diulang setelah sisa antrean HyP3 selesai.
+
+| Ukuran | Nilai |
+|---|---|
+| Piksel kota terukur | 84% (6.025 dari 7.212) |
+| Selisih ascending dan descending | RMSE 0,69 cm/tahun, bias -0,61, korelasi 0,985 |
+| GNSS CPKL (pembanding, di kota yang ambles) | periode sama 2020-2021: GNSS 10,00, InSAR 10,00 cm/tahun. Seluruh catatan: GNSS 11,56 (2010-2021), InSAR 7,78 (2020-2026) |
+| Laju di CPKL per periode (InSAR) | 10,0 (2020-2021), 7,2 (2022-2023), 6,7 (2024-2026) cm/tahun: melambat |
+| Laju kota | median 6,9 cm/tahun, maksimum 11,1 per piksel; 25 dari 27 kelurahan kategori tinggi |
 | Gerbang mutu | lulus |
 
 ### Temuan saat olah wilayah baru
@@ -41,8 +54,11 @@ node scripts/ringkasan-wilayah.mjs                         # kartu perbandingan 
 2. **`waterMask.h5` belum ada pada olahan pertama.** Di Semarang berkas itu tersisa dari olahan lama. `04_mintpy.py` kini membaca masker air dari `inputs/geometryGeo.h5` bila perlu.
 3. **Pembanding di luar cakupan citra** dicatat "tidak terukur" dan tidak ikut menentukan lulus. Titik ikat yang tidak terukur tetap membuat gerbang gagal.
 4. **Statistik perbukitan** hanya dihitung bila wilayah memakai koreksi troposfer perbukitan. Di Jakarta piksel di atas 80 m hanyalah dataran selatan.
-5. **Pekalongan: laju di stasiun CPKL lebih kecil dari GNSS.** Diuji tiga cara di lintasan ascending: jaringan lengkap -5,55 cm/tahun arah pandang, dengan koreksi galat unwrapping phase closure -5,55 (tidak berubah), hanya pasangan sampai 60 hari -4,20 (bias pasangan pendek). Jaringan lengkap tetap dipakai. GNSS CPKL 11,56 cm/tahun vertikal (2018-2021).
+5. **Pekalongan: laju di stasiun CPKL lebih kecil dari GNSS, karena periodenya beda.** Rerata seluruh catatan GNSS CPKL 11,56 cm/tahun (2010-2021), InSAR 2020-2026 7,78. Diuji dulu di lintasan ascending: koreksi galat unwrapping phase closure tidak mengubah laju, dan jaringan pasangan pendek (sampai 60 hari) malah menurunkannya (bias pasangan pendek), jadi jaringan lengkap tetap dipakai. Penyebab sebenarnya: deret GNSS berakhir Desember 2021, dan pada periode yang sama (2020-2021) GNSS dan InSAR sama-sama 10,00 cm/tahun. Sesudah itu laju di CPKL melambat. `05_vertikal_validasi.py` kini membandingkan stasiun pembanding pada periode tumpang tindih bila deret waktunya ada di `<olah>/gnss` (minimal 1,5 tahun), dan gerbang memakai angka periode itu.
 6. **Internet putus** membuat `status_hyp3.py` gagal dan putaran unduh mengira antrean kosong. Skrip putaran sekarang menganggap status yang gagal dibaca sebagai masih berjalan.
+7. **Baseline NaN di produk HyP3.** Satu produk descending Pekalongan (20240818_20240911) berisi `Baseline: nan`. Inversi baseline MintPy lalu gagal dengan "SVD did not converge in Linear Least Squares". `04_mintpy.py` sekarang membuang pasangan seperti itu lewat `mintpy.network.excludeDate12`.
+8. **Zip setengah jadi.** Unduhan yang terputus meninggalkan zip rusak yang terus dipakai di putaran berikutnya ("pita unw_phase tidak ada di zip"). `03_unduh_potong.py` kini menghapus zip yang gagal diunduh atau tidak terbaca.
+9. **RTRW Kota Pekalongan tidak tersedia terbuka.** Layanan pola ruang Provinsi Jawa Tengah yang terbuka hanya memuat Kendal, Semarang, Demak, dan Jepara. Layanan "RTRW_KOTA_PEKALONGAN" di ArcGIS Online milik akun pribadi tanpa sumber dan lisensi, jadi tidak dipakai. `07_konteks.py` melewati lapis pola ruang bila layanan provinsi tidak punya fitur di wilayah itu.
 
 ## Status Semarang
 

@@ -38,6 +38,7 @@ type StatusPil =
   | 'Tidak tercatat'
   | 'Perkiraan'
   | 'Perlu akun'
+  | 'Ditautkan'
 
 /** Catatan proses hanya dipercaya bila dataset memang ditandai hasil olahan. */
 const prosesOlahan = (meta: DatasetMeta | null) => (meta?.jenis === 'olahan' ? meta.proses : undefined)
@@ -113,7 +114,7 @@ const TEKS: Record<IdWilayah, { acuan: string; validasi: string; gnss: string; b
     gnss: 'Pekalongan tidak punya stasiun GNSS terbuka di area stabil. Stasiun CPKL justru berada di kota yang ambles cepat. Karena itu acuan diambil dari tanah tinggi di selatan, dan CPKL dipakai sebagai pembanding independen di area yang ambles.',
     batasan: 'Acuan Pekalongan memakai tanah tinggi yang dianggap stabil, bukan stasiun GNSS. Bila tanah tinggi itu ikut bergerak, seluruh angka bergeser sebesar gerak itu.',
     cekSumber:
-      'Sumber konteks dicek pada 14 November 2026. Lapis pola ruang memakai RTRW Provinsi Jawa Tengah yang tersedia sebagai layanan publik. Raster Peta Geologi Lembar Banjarnegara dan Pekalongan diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Seluruh Kota Pekalongan berada di satuan Aluvium.',
+      'Sumber konteks dicek pada 15 November 2026. Layanan publik RTRW Provinsi Jawa Tengah hanya memuat Kendal, Semarang, Demak, dan Jepara, dan RTRW Kota Pekalongan belum tersedia terbuka dari sumber resmi, jadi lapis pola ruang belum ada. Raster Peta Geologi Lembar Banjarnegara dan Pekalongan diunduh tim dari GeoMap Pusat Survei Geologi (perlu akun) lalu didigitasi. Seluruh Kota Pekalongan berada di satuan Aluvium.',
     gantiResmi: 'Bila tim memperoleh RTRW Kota Pekalongan atau data bor yang menunjukkan tebal endapan lunak',
     batas: 'Batas wilayah: BPS 2020 lewat OCHA HDX (CC BY-IGO).',
   },
@@ -130,10 +131,11 @@ const TEKS: Record<IdWilayah, { acuan: string; validasi: string; gnss: string; b
 }
 
 /** Sumber konteks khusus tiap wilayah: pola ruang dan peta geologi. */
-const SUMBER_KONTEKS: Record<IdWilayah, { tataRuang: [string, string][]; peta: string; kuarter?: string }> = {
+// tanpaPolaRuang: tidak ada layanan pola ruang resmi yang terbuka untuk wilayah ini.
+const SUMBER_KONTEKS: Record<IdWilayah, { tataRuang: [string, string][]; peta: string; kuarter?: string; tanpaPolaRuang?: boolean }> = {
   semarang: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)'], ['RTRW Kota Semarang (GISTARU, geoportal Pemkot)', 'Pola ruang rinci']], peta: 'Peta Geologi Lembar Magelang dan Semarang 1:100.000 (PSG)', kuarter: 'Peta Geologi Kuarter Lembar Semarang 1:50.000 (PSG)' },
   jakarta: { tataRuang: [['RDTR DKI Jakarta 2022 (Pergub 31/2022), layanan DPMPTSP DKI', 'Lapis pola ruang (rinci)']], peta: 'Peta Geologi Lembar Jakarta dan Kepulauan Seribu 1:100.000 (PSG)' },
-  pekalongan: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)']], peta: 'Peta Geologi Lembar Banjarnegara dan Pekalongan 1:100.000 (PSG)' },
+  pekalongan: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Layanan publiknya tidak mencakup Kota Pekalongan'], ['RTRW Kota Pekalongan', 'Pola ruang kota']], tanpaPolaRuang: true, peta: 'Peta Geologi Lembar Banjarnegara dan Pekalongan 1:100.000 (PSG)' },
   demak: { tataRuang: [['RTRW Provinsi Jawa Tengah 2024-2044', 'Lapis pola ruang (skala provinsi)']], peta: 'Peta Geologi Lembar Kudus dan Lembar Salatiga 1:100.000 (PSG)' },
 }
 
@@ -149,10 +151,11 @@ function susunSumber(meta: DatasetMeta | null, konteks: Partial<Record<JenisLapi
     ['GNSS CORS Pantura (Susilo dkk. 2023)', 'Titik ikat dan validasi', p?.validasi?.gnss?.length ? 'Dipakai' : 'Rencana'],
     ['DEM Copernicus GLO-30', geologiResmi ? 'Koreksi saat olah, dan cek batas satuan geologi' : 'Koreksi saat olah, dan perkiraan satuan geologi', p || konteks.geologi ? 'Dipakai' : 'Rencana'],
     // Baris berikut: hasil cek layanan publik pada 13 dan 14 November 2026 (lihat catatan di bawah tabel).
-    ...sk.tataRuang.map(([a, b], i): [string, string, StatusPil] => [a, b, i === 0 ? (konteks.rtrw ? 'Dipakai' : 'Rencana') : 'Tidak tersedia terbuka']),
+    ...sk.tataRuang.map(([a, b], i): [string, string, StatusPil] => [a, b, i === 0 && !sk.tanpaPolaRuang ? (konteks.rtrw ? 'Dipakai' : 'Rencana') : 'Tidak tersedia terbuka']),
     [sk.peta, 'Lapis geologi, didigitasi tim', geologiResmi ? 'Dipakai' : 'Perlu akun'],
     ...(geologiResmi ? [] : [['Satuan geologi dari bentuk lahan', 'Lapis geologi sementara', konteks.geologi ? 'Perkiraan' : 'Tidak tersedia terbuka'] as [string, string, StatusPil]]),
     ...(sk.kuarter ? [[sk.kuarter, 'Rincian endapan muda', 'Perlu akun'] as [string, string, StatusPil]] : []),
+    ['Peta bidang tanah BHUMI ATR/BPN', 'Batas persil dan NIB: laporan menautkan ke BHUMI, karena tidak ada layanan peta terbuka', 'Ditautkan'],
     ['Bahaya banjir dan abrasi (InaRISK BNPB)', 'Konteks rob', 'Lisensi belum jelas'],
   ]
 }
@@ -693,7 +696,7 @@ export default function MethodView() {
 
         <Bagian id="alur" judul="Alur olah data">
           {meta?.jenis === 'demo' && <Notice>{belumJalan} langkah pertama belum dijalankan. Peta saat ini memakai data demo ilustratif.</Notice>}
-          {meta?.jenis === 'unggahan' && <Notice>Data unggahan tidak membawa catatan cara olahnya. Urutan di bawah adalah alur baku PANTAU AMBLES.</Notice>}
+          {meta?.jenis === 'unggahan' && <Notice>Data unggahan tidak membawa catatan cara olahnya. Urutan di bawah adalah alur baku SubTen.</Notice>}
           {meta?.jenis === 'olahan' && !proses && <Notice>Data ini ditandai hasil olahan, tetapi tidak membawa catatan proses.</Notice>}
           <ol className="space-y-3">
             {alur.map((a, i) => (
@@ -778,7 +781,9 @@ export default function MethodView() {
                     <dd className="text-ink">
                       {g.insar == null
                         ? `GNSS ${fmt(g.gnss, 2)} cm/tahun; InSAR tidak terukur di stasiun ini (di luar cakupan citra atau koherensi rendah)`
-                        : `GNSS ${fmt(g.gnss, 2)} cm/tahun, InSAR ${fmt(g.insar, 2)} cm/tahun, selisih ${fmt(Math.abs(g.gnss - g.insar), 2)} cm/tahun`}
+                        : g.periodeSama
+                          ? `Periode sama (${Math.floor(g.periodeSama.awal)} sampai ${Math.ceil(g.periodeSama.akhir) - 1}): GNSS ${fmt(g.periodeSama.gnss, 2)}, InSAR ${fmt(g.periodeSama.insar, 2)} cm/tahun, selisih ${fmt(Math.abs(g.periodeSama.gnss - g.periodeSama.insar), 2)}. Seluruh catatan: GNSS ${fmt(g.gnss, 2)}, InSAR ${fmt(g.insar, 2)} cm/tahun.`
+                          : `GNSS ${fmt(g.gnss, 2)} cm/tahun, InSAR ${fmt(g.insar, 2)} cm/tahun, selisih ${fmt(Math.abs(g.gnss - g.insar), 2)} cm/tahun`}
                     </dd>
                   </div>
                 ))}

@@ -1,5 +1,5 @@
 {
- "dibuat": "2026-11-14",
+ "dibuat": "2026-11-15",
  "ambangCm": [
   2,
   4
@@ -91,7 +91,45 @@
   },
   {
    "id": "pekalongan",
-   "status": "belum"
+   "status": "olahan",
+   "nama": "Kota Pekalongan",
+   "periode": [
+    "2020-01",
+    "2026-11"
+   ],
+   "lulusGerbang": true,
+   "nKelurahan": 27,
+   "nKelurahanMemadai": 26,
+   "nKelurahanTinggi": 25,
+   "tercepat": [
+    {
+     "nama": "Pasirkratonkramat",
+     "kecamatan": "Pekalongan Barat",
+     "laju": 9.7
+    },
+    {
+     "nama": "Tirto",
+     "kecamatan": "Pekalongan Barat",
+     "laju": 9.2
+    },
+    {
+     "nama": "Banyurip",
+     "kecamatan": "Pekalongan Selatan",
+     "laju": 9
+    }
+   ],
+   "piksel": {
+    "dalamWilayah": 7212,
+    "terukur": 6025,
+    "persenTerukur": 84,
+    "median": 6.89,
+    "p95": 9.6,
+    "maks": 11.1,
+    "luasKm2": {
+     "min2": 38.3,
+     "min4": 35.1
+    }
+   }
   },
   {
    "id": "demak",

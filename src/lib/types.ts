@@ -1,4 +1,4 @@
-// Tipe data inti PANTAU AMBLES.
+// Tipe data inti SubTen.
 // Laporan dibaca per titik dari grid piksel (blok sekitar 240 m). Kelurahan ("kawasan")
 // dipakai untuk nama lokasi, ringkasan Dashboard, dan data unggahan tanpa grid.
 
@@ -65,7 +65,14 @@ export interface ValidasiProses {
   antarLintasan?: { n: number; rmse: number; bias: number; r: number }
   /** Laju InSAR di lokasi stasiun GNSS dibanding laju GNSS. */
   /** insar null = stasiun tidak terukur (di luar cakupan citra atau koherensi rendah) */
-  gnss?: { stasiun: string; peran?: 'titik ikat' | 'pembanding'; gnss: number; insar: number | null }[]
+  gnss?: {
+    stasiun: string
+    peran?: 'titik ikat' | 'pembanding'
+    gnss: number
+    insar: number | null
+    /** Laju keduanya pada periode yang tumpang tindih (GNSS berakhir lebih awal dari InSAR). */
+    periodeSama?: { awal: number; akhir: number; gnss: number; insar: number }
+  }[]
   lulus: boolean
   catatan?: string
 }

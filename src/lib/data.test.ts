@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import mentah from '../../public/data/semarang-kawasan.geojson?raw'
 import { cariKawasanDiTitik, indeksKawasan, validasiDataset } from './data'
 import { imporCSV, imporGeoJSON, parseCSV, templatCSV } from './importer'
-import { buatLaporanPdf } from './pdf'
+import { buatLaporanPdf, type KonteksPdf } from './pdf'
+import type { Position } from './types'
 import { klasifikasi } from './risk'
 
 const kotak = (x: number) => ({ type: 'Polygon', coordinates: [[[x, 0], [x + 1, 0], [x + 1, 1], [x, 1], [x, 0]]] })
@@ -151,22 +152,66 @@ describe('impor', () => {
 })
 
 describe('PDF Laporan Ambles', () => {
+  // kotak sekitar titik (derajat) untuk peta mini contoh
+  const kotak = (p: Position, x0: number, y0: number, x1: number, y1: number): Position[] => [
+    [p[0] + x0, p[1] + y0],
+    [p[0] + x1, p[1] + y0],
+    [p[0] + x1, p[1] + y1],
+    [p[0] + x0, p[1] + y1],
+  ]
+  // konteks contoh: zona permukiman di atas Aluvium (kode sama dengan lapis konteks asli)
+  const konteksDi = (p: Position): KonteksPdf[] => [
+    {
+      jenis: 'rtrw',
+      sumber: 'Pola ruang RTRW Provinsi Jawa Tengah 2024-2044, skala 1:250.000',
+      kode: '32100000',
+      nama: 'Kawasan Permukiman',
+      fungsi: 'Budi daya',
+      warna: '#f2c48d',
+      peta: [
+        { nama: 'Kawasan Permukiman', warna: '#f2c48d', cincin: [kotak(p, -0.006, -0.006, 0.002, 0.006)] },
+        { nama: 'Kawasan Peruntukan Industri', warna: '#b9a3e3', cincin: [kotak(p, 0.002, -0.006, 0.006, 0.006)] },
+      ],
+    },
+    {
+      jenis: 'geologi',
+      sumber: 'Peta Geologi Lembar Magelang dan Semarang, skala 1:100.000',
+      kode: 'Qa',
+      nama: 'Aluvium',
+      batuan: 'Endapan dataran pantai',
+      bacaan: null,
+      warna: '#f0e18a',
+      peta: [{ nama: 'Aluvium', warna: '#f0e18a', cincin: [kotak(p, -0.01, -0.01, 0.01, 0.01)] }],
+    },
+  ]
   const buat = async (nama: string, memadai: boolean) => {
     // kawasan tanpa data dibuat sendiri: file data bawaan belum tentu punya satu
     const k = memadai ? kawasan.find((x) => x.nama === nama)! : { ...kawasan[0]!, memadai: false, laju: null, sigma: null, sebaran: null, nPiksel: 0, deret: [] }
+    const konteks = konteksDi(k.pusat)
     const kategori = klasifikasi(k.laju, k.memadai, { sedang: 2, tinggi: 4 })
-    const blob = await buatLaporanPdf({ kawasan: k, kategori, tenor: 15, thresholds: { sedang: 2, tinggi: 4 }, meta: asli.dataset.metadata, label: nama, lngLat: k.pusat, gambarPeta: null })
+    const blob = await buatLaporanPdf({ kawasan: k, kategori, tenor: 15, thresholds: { sedang: 2, tinggi: 4 }, meta: asli.dataset.metadata, label: nama, lngLat: k.pusat, gambarPeta: null, konteks })
     return { blob, teks: new TextDecoder('latin1').decode(await blob.arrayBuffer()) }
   }
-  it('satu halaman untuk kawasan kategori tinggi', async () => {
+  it('dua halaman untuk kawasan kategori tinggi: laporan dan konteks lokasi', async () => {
     const { blob, teks } = await buat('Kaligawe', true)
     expect(blob.size).toBeGreaterThan(5000)
     expect(teks.startsWith('%PDF-')).toBe(true)
-    expect(teks).toContain('/Count 1')
+    expect(teks).toContain('/Count 2')
+    expect(teks).toContain('SubTen')
     if (demo) expect(teks).toContain('DATA DEMO ILUSTRATIF')
     else expect(teks).not.toContain('DATA DEMO ILUSTRATIF')
     expect(teks).toContain('Jika tren bertahan')
     expect(teks).toContain('Status kawasan')
+  })
+  it('halaman konteks menjelaskan pola ruang, geologi, dan persil', async () => {
+    const { teks } = await buat('Kaligawe', true)
+    expect(teks).toContain('Konteks lokasi')
+    expect(teks).toContain('STATUS UNTUK RUMAH TINGGAL')
+    expect(teks).toContain('250 m')
+    expect(teks).toContain('KERENTANAN MEMADAT')
+    expect(teks).toContain('Lapisan keras')
+    expect(teks).toContain('Tanyakan ke penjual'.toUpperCase())
+    expect(teks).toContain('bhumi.atrbpn.go.id')
   })
   it('laporan titik menyebut blok di sekitar titik, bukan kawasan', async () => {
     const k = kawasan.find((x) => x.nama === 'Kaligawe')!
@@ -183,7 +228,7 @@ describe('PDF Laporan Ambles', () => {
       lebarBlokM: 240,
     })
     const teks = new TextDecoder('latin1').decode(await blob.arrayBuffer())
-    expect(teks).toContain('/Count 1')
+    expect(teks).toContain('/Count 2')
     expect(teks).toContain('Status di titik ini')
     expect(teks).toContain('blok sekitar 240 m')
     expect(teks).toContain('Kelurahan Kaligawe, Kecamatan')
@@ -198,9 +243,9 @@ describe('PDF Laporan Ambles', () => {
       fs.writeFileSync(`${import.meta.env.VITE_PDF_OUT}/contoh-${memadai ? 'tinggi' : 'tidak-memadai'}.pdf`, new Uint8Array(await blob.arrayBuffer()))
     }
   })
-  it('satu halaman untuk kawasan tanpa data memadai', async () => {
+  it('dua halaman untuk kawasan tanpa data memadai', async () => {
     const { teks } = await buat('', false)
-    expect(teks).toContain('/Count 1')
+    expect(teks).toContain('/Count 2')
     expect(teks).toContain('Data tidak memadai')
   })
 })

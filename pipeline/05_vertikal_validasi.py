@@ -41,9 +41,12 @@ from umum import AOI_KOTA, AREA_STABIL, EPSG_UTM, KERJA, LINTASAN, PEMBANDING, P
 # Gerbang mutu (cm/tahun).
 MAKS_RMSE_ANTAR_LINTASAN = 1.0
 MAKS_SELISIH_GNSS = 0.5  # di stasiun titik ikat
-# Stasiun pembanding: periode GNSS (sampai 2021) tidak sama dengan periode InSAR (2020 dan seterusnya),
-# jadi batasnya lebih longgar.
+# Stasiun pembanding: dibandingkan pada periode yang tumpang tindih dengan InSAR bila deret waktu GNSS
+# tersedia di <olah>/gnss (laju ambles bisa berubah dari tahun ke tahun, mis. CPKL melambat setelah 2021).
+# Batasnya lebih longgar dari titik ikat karena periode tumpang tindih pendek (GNSS berakhir 2021).
 MAKS_SELISIH_PEMBANDING = 1.0
+MIN_TUMPANG_TAHUN = 1.5
+DIR_GNSS = KERJA.parent / "gnss"
 
 
 def tahun_desimal(tanggal: str) -> float:
@@ -135,6 +138,25 @@ def triwulan(deret: np.ndarray, tahun: np.ndarray, laju: np.ndarray, epoch: np.n
     return hasil - hasil[0]
 
 
+def baca_gnss(nama: str) -> tuple[np.ndarray, np.ndarray] | None:
+    """Deret waktu GNSS Susilo dkk. (2023): (tahun desimal, naik dalam cm), atau None bila berkas tidak ada."""
+    f = DIR_GNSS / f"{nama}_clean_Noff1site.rneu"
+    if not f.exists():
+        return None
+    d = np.loadtxt(f, comments="#")
+    return d[:, 1], d[:, 4] * 100
+
+
+def laju_gnss(tahun: np.ndarray, naik: np.ndarray, a: float, b: float) -> float | None:
+    """Laju turun (cm/tahun, positif = turun) dalam [a, b]: tren linear plus musiman tahunan."""
+    m = (tahun >= a) & (tahun <= b)
+    if m.sum() < 100:
+        return None
+    t = tahun[m]
+    A = np.c_[t - t.mean(), np.ones(len(t)), np.sin(2 * np.pi * t), np.cos(2 * np.pi * t)]
+    return -float(np.linalg.lstsq(A, naik[m], rcond=None)[0][0])
+
+
 def persentil(nilai: np.ndarray, daftar: list[int]) -> dict[str, float]:
     return {f"p{p}": round(float(v), 2) for p, v in zip(daftar, np.percentile(nilai, daftar))}
 
@@ -213,8 +235,8 @@ def main() -> None:
 
     ke_utm = Transformer.from_crs(4326, EPSG_UTM, always_xy=True)
 
-    def laju_di(lat: float, lon: float, tanpa_tengah: bool = False) -> float | None:
-        """Median laju di blok 3 x 3 piksel sekitar satu titik."""
+    def blok_di(lat: float, lon: float, tanpa_tengah: bool = False) -> np.ndarray | None:
+        """Piksel terukur di blok 3 x 3 sekitar satu titik, atau None bila di tepi/luar grid."""
         x, y = ke_utm.transform(lon, lat)
         c, r = int((x - x0) // PIKSEL_M), int((y0 - y) // PIKSEL_M)
         if not (1 <= r < ny - 1 and 1 <= c < nx - 1):
@@ -224,7 +246,12 @@ def main() -> None:
         if tanpa_tengah:
             blok[r, c] = False  # piksel referensi nol karena definisi
         m = blok & terukur
-        return round(float(np.median(laju[m])), 2) if m.any() else None
+        return m if m.any() else None
+
+    def laju_di(lat: float, lon: float, tanpa_tengah: bool = False) -> float | None:
+        """Median laju di blok 3 x 3 piksel sekitar satu titik."""
+        m = blok_di(lat, lon, tanpa_tengah)
+        return round(float(np.median(laju[m])), 2) if m is not None else None
 
     gnss = []
     if REF_LAJU_TURUN_CM is not None:
@@ -236,12 +263,6 @@ def main() -> None:
     for s_ in gnss:
         if s_["insar"] is None:
             s_["catatan"] = "tidak terukur: di luar cakupan citra atau koherensi rendah"
-    cocok = [
-        (s_["insar"] is None and s_["peran"] == "pembanding")
-        or (s_["insar"] is not None and abs(s_["insar"] - s_["gnss"]) <= (MAKS_SELISIH_GNSS if s_["peran"] == "titik ikat" else MAKS_SELISIH_PEMBANDING))
-        for s_ in gnss
-    ]
-    lulus = rmse <= MAKS_RMSE_ANTAR_LINTASAN and all(cocok)
 
     # statistik perbukitan hanya bermakna di wilayah yang memang punya perbukitan stabil (koreksi troposfer "bukit");
     # di Jakarta piksel di atas ambang ini hanyalah dataran selatan, bukan perbukitan
@@ -267,6 +288,36 @@ def main() -> None:
     deret[:, dua] = (100 * urai(qa, qd)[0])[:, dua]
     deret[:, hanya_a] = (100 * qa / ta_a)[:, hanya_a]
     deret[:, hanya_d] = (100 * qd / ta_d)[:, hanya_d]
+
+    # ---------- pembanding GNSS pada periode yang sama ----------
+    for s_ in gnss:
+        if s_["peran"] != "pembanding" or s_["insar"] is None:
+            continue
+        g = baca_gnss(s_["stasiun"])
+        st = PEMBANDING[s_["stasiun"]]["lalo"]
+        m = blok_di(*st)
+        if g is None or m is None:
+            continue
+        a, b = max(float(epoch[0]) - 0.125, float(g[0].min())), min(float(epoch[-1]) + 0.125, float(g[0].max()))
+        e = (epoch >= a) & (epoch <= b)
+        lg = laju_gnss(*g, a, b)
+        if b - a < MIN_TUMPANG_TAHUN or e.sum() < 5 or lg is None:
+            continue
+        seri = np.median(deret[:, m], axis=1)
+        li = -float(np.polyfit(epoch[e], seri[e], 1)[0])
+        s_["periodeSama"] = {"awal": round(a, 2), "akhir": round(b, 2), "gnss": round(lg, 2), "insar": round(li, 2)}
+        print(f"  {s_['stasiun']}: periode sama {a:.2f}-{b:.2f}, GNSS {lg:.2f}, InSAR {li:.2f} cm/tahun")
+
+    def selisih_st(s_: dict) -> float:
+        p = s_.get("periodeSama")
+        return abs(p["insar"] - p["gnss"]) if p else abs(s_["insar"] - s_["gnss"])
+
+    cocok = [
+        (s_["insar"] is None and s_["peran"] == "pembanding")
+        or (s_["insar"] is not None and selisih_st(s_) <= (MAKS_SELISIH_GNSS if s_["peran"] == "titik ikat" else MAKS_SELISIH_PEMBANDING))
+        for s_ in gnss
+    ]
+    lulus = rmse <= MAKS_RMSE_ANTAR_LINTASAN and all(cocok)
 
     koherensi = (asc["koherensi"] + desc["koherensi"]) / 2
 
