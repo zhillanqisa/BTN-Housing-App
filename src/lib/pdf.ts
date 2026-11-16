@@ -74,10 +74,10 @@ const M = 16
 const W = 210
 const H = 297
 const LEBAR = W - 2 * M
-const TINTA: RGB = [22, 22, 29]
-const ABU: RGB = [98, 98, 112]
-const GARIS: RGB = [216, 216, 225]
-const DATA: RGB = [106, 79, 211]
+const TINTA: RGB = [15, 29, 51]
+const ABU: RGB = [84, 96, 116]
+const GARIS: RGB = [214, 220, 230]
+const DATA: RGB = [180, 80, 31]
 
 function rgb(hex: string): RGB {
   const n = parseInt(hex.slice(1), 16)
@@ -213,7 +213,7 @@ function gambarGrafik(doc: JsPdf, a: ReturnType<typeof alat>, deret: [number, nu
 
   doc.setLineWidth(0.2)
   for (let v = yA; v >= yB - 1e-9; v -= langkah) {
-    doc.setDrawColor(...(v === 0 ? ([170, 170, 182] as RGB) : GARIS))
+    doc.setDrawColor(...(v === 0 ? ([168, 176, 190] as RGB) : GARIS))
     doc.line(kiri, py(v), kanan, py(v))
     a.teks(fmt(v), kiri - 1.5, py(v) + 1, { ukuran: 7, warna: ABU, rata: 'right' })
   }
@@ -308,7 +308,7 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
   const lebarChip = a.lebarTeks(labelKat, { ukuran: 8.5, tebal: true }) + 7
   doc.setFillColor(...rgb(WARNA_KATEGORI.light[kategori]))
   doc.roundedRect(M, y + 17.5, lebarChip, 6.4, 3.2, 3.2, 'F')
-  a.teks(labelKat, M + 3.5, y + 21.9, { ukuran: 8.5, tebal: true, warna: kategori === 'tinggi' || kategori === 'sedang' ? [255, 255, 255] : TINTA })
+  a.teks(labelKat, M + 3.5, y + 21.9, { ukuran: 8.5, tebal: true, warna: kategori === 'tinggi' ? [255, 255, 255] : TINTA })
   const yKiri = a.paragraf(kalimatStatus(k.laju, k.sigma, kategori, titik), M, y + 30, lebarKiri, { ukuran: 9.5 })
   y = Math.max(yKiri, yKanan) + 3
 
@@ -332,7 +332,7 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
       const p = hitungProyeksi(k.laju!, k.sigma ?? 0, tn)
       const x = M + i * (lebarSel + 4)
       const aktif = tn === tenor
-      doc.setFillColor(...(aktif ? ([238, 235, 252] as RGB) : ([246, 246, 249] as RGB)))
+      doc.setFillColor(...(aktif ? ([226, 242, 239] as RGB) : ([244, 246, 250] as RGB)))
       doc.setDrawColor(...(aktif ? DATA : GARIS))
       doc.setLineWidth(aktif ? 0.6 : 0.3)
       doc.roundedRect(x, y, lebarSel, 17.5, 2, 2, 'FD')
@@ -448,7 +448,7 @@ function gambarPetaMini(doc: JsPdf, a: ReturnType<typeof alat>, x: number, y: nu
   doc.setDrawColor(255, 255, 255)
   doc.setLineWidth(0.15)
   for (const f of fitur) {
-    doc.setFillColor(...rgb(/^#[0-9a-f]{6}$/i.test(f.warna) ? f.warna : '#c9c9d1'))
+    doc.setFillColor(...rgb(/^#[0-9a-f]{6}$/i.test(f.warna) ? f.warna : '#c8ced8'))
     for (const c of f.cincin) {
       const m = klipKotak(
         c.map((p): Titik => [(p[0] - pusat[0]) * 111320 * cos, (p[1] - pusat[1]) * 110540]),
@@ -464,19 +464,19 @@ function gambarPetaMini(doc: JsPdf, a: ReturnType<typeof alat>, x: number, y: nu
   const [px, py] = keMm([0, 0])
   doc.setFillColor(255, 255, 255)
   doc.circle(px, py, 2.2, 'F')
-  doc.setFillColor(...MEREK.penanda)
-  doc.setDrawColor(22, 22, 29)
+  doc.setFillColor(...MEREK.teal)
+  doc.setDrawColor(15, 29, 51)
   doc.setLineWidth(0.5)
   doc.circle(px, py, 1.4, 'FD')
   // skala 250 m
   const p250 = 250 * k
   doc.setFillColor(255, 255, 255)
   doc.roundedRect(x + 1.5, y + uk - 6.2, p250 + 4, 4.7, 1, 1, 'F')
-  doc.setFillColor(22, 22, 29)
+  doc.setFillColor(15, 29, 51)
   doc.rect(x + 3.5, y + uk - 3, p250, 0.8, 'F')
   a.teks('250 m', x + 3.5, y + uk - 3.6, { ukuran: 5.8, tebal: true })
   // utara
-  doc.setFillColor(22, 22, 29)
+  doc.setFillColor(15, 29, 51)
   doc.triangle(x + uk - 4, y + 2.2, x + uk - 5.6, y + 6.2, x + uk - 2.4, y + 6.2, 'F')
   a.teks('U', x + uk - 4, y + 9, { ukuran: 6, tebal: true, rata: 'center' })
   // legenda: kelas di titik dulu, lalu kelas lain di sekitar, paling banyak tiga
@@ -485,7 +485,7 @@ function gambarPetaMini(doc: JsPdf, a: ReturnType<typeof alat>, x: number, y: nu
   let yy = y + uk + 3.6
   for (const n of unik) {
     const f = fitur.find((ff) => ff.nama === n)
-    doc.setFillColor(...rgb(f && /^#[0-9a-f]{6}$/i.test(f.warna) ? f.warna : '#c9c9d1'))
+    doc.setFillColor(...rgb(f && /^#[0-9a-f]{6}$/i.test(f.warna) ? f.warna : '#c8ced8'))
     doc.rect(x, yy - 2.3, 2.6, 2.6, 'F')
     const teks = n.replace(/^Kawasan (Peruntukan )?/, '')
     a.teks(teks.length > 30 ? `${teks.slice(0, 29)}…` : teks, x + 3.8, yy, { ukuran: 6.8, tebal: n === namaDiTitik, warna: n === namaDiTitik ? TINTA : ABU })
@@ -501,7 +501,7 @@ function gambarStrip(doc: JsPdf, a: ReturnType<typeof alat>, x: number, y: numbe
   opsi.forEach((o, i) => {
     const xx = x + i * (lebar + 1.5)
     const ini = o.nilai === aktif
-    doc.setFillColor(...((ini ? (waspada ? [255, 236, 179] : [22, 22, 29]) : [240, 240, 244]) as RGB))
+    doc.setFillColor(...((ini ? (waspada ? [255, 236, 179] : [15, 29, 51]) : [237, 241, 246]) as RGB))
     doc.roundedRect(xx, y + 2, lebar, 7, 1.8, 1.8, 'F')
     a.teks(o.label, xx + lebar / 2, y + 6.6, { ukuran: 7.8, tebal: ini, warna: ini ? (waspada ? [90, 66, 0] : [255, 255, 255]) : ABU, rata: 'center' })
   })
@@ -521,7 +521,7 @@ function gambarPenampang(doc: JsPdf, a: ReturnType<typeof alat>, x: number, y: n
     return r
   })
   for (const l of lapis) {
-    doc.setFillColor(...rgb(/^#[0-9a-f]{6}$/i.test(l.warna) ? l.warna : '#c9c9d1'))
+    doc.setFillColor(...rgb(/^#[0-9a-f]{6}$/i.test(l.warna) ? l.warna : '#c8ced8'))
     doc.rect(x, l.y, kolom, l.t, 'F')
     // pola: titik, gelombang, atau arsir
     doc.setDrawColor(0, 0, 0)
@@ -597,7 +597,7 @@ function gambarLangkah(doc: JsPdf, a: ReturnType<typeof alat>, x: number, y: num
     const xx = x + i * (lebar + 3)
     doc.setFillColor(246, 246, 249)
     doc.roundedRect(xx, y, lebar, 11.5, 2, 2, 'F')
-    doc.setFillColor(22, 22, 29)
+    doc.setFillColor(15, 29, 51)
     doc.circle(xx + 4.6, y + 5.75, 2.4, 'F')
     a.teks(String(i + 1), xx + 4.6, y + 6.85, { ukuran: 8, tebal: true, warna: [255, 255, 255], rata: 'center' })
     const yb = a.paragraf(l, xx + 8.6, y + 4.6, lebar - 10.5, { ukuran: 7.6, tebal: true })
@@ -723,7 +723,7 @@ function halamanKonteks(doc: JsPdf, a: ReturnType<typeof alat>, d: DataLaporanPd
       const geo = penjelasanGeologi(kx.kode)
       if (geo) {
         yKn = gambarStrip(doc, a, xKanan, yKn, wKanan, `Kerentanan memadat  ·  ${geo.umur.split(',')[0]}`, SKALA_DAYA, geo.daya, geo.daya === 'lunak') + 2
-        yKn = gambarPenampang(doc, a, xKanan, yKn, wKanan, 33, susunPenampang(geo.daya, kx.warna ?? '#c9c9d1', kx.nama))
+        yKn = gambarPenampang(doc, a, xKanan, yKn, wKanan, 33, susunPenampang(geo.daya, kx.warna ?? '#c8ced8', kx.nama))
       }
       y = Math.max(yKiri, yKn) + 2
       if (kx.bacaan) sub('Dibanding laju di titik ini', kx.bacaan)

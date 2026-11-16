@@ -52,7 +52,7 @@ LAPIS = {
     "abrasi": {
         "layanan": "layer_bahaya_gelombang_ekstrim_dan_abrasi",
         "judul": "Indeks bahaya gelombang ekstrem dan abrasi (InaRISK BNPB)",
-        "warna": {"rendah": "#f2d29b", "sedang": "#e08a3c", "tinggi": "#a8461d"},
+        "warna": {"rendah": "#ddd0f3", "sedang": "#9a7fd6", "tinggi": "#5b3c9e"},
         "catatan": (
             "Bahaya gelombang ekstrem dan abrasi hanya dipetakan di jalur pantai. Lapis ini hasil pemodelan nasional pada grid 100 m, "
             "bukan pengukuran garis pantai terbaru."

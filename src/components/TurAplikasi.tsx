@@ -350,7 +350,7 @@ function Sambutan({ onMulai, onLewati, tombolUtama }: { onMulai: () => void; onL
         {ALUR.map(({ Ikon, judul, isi }, i) => (
           <li key={judul} className="relative rounded-[14px] bg-surface-2 p-3">
             <span className="tnum absolute right-2.5 top-2 text-[11px] font-bold text-ink-3">{i + 1}</span>
-            <Ikon size={20} weight="duotone" className="text-data" aria-hidden="true" />
+            <Ikon size={20} weight="duotone" className="text-accent" aria-hidden="true" />
             <span className="mt-2 block text-[13px] font-bold leading-tight text-ink">{judul}</span>
             <span className="mt-0.5 block text-[11.5px] leading-snug text-ink-3">{isi}</span>
           </li>

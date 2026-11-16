@@ -38,8 +38,8 @@ const L_BLOK = 'pa-blok-garis'
 const SRC_REDUP = 'pa-redup'
 const L_REDUP = 'pa-redup-isi'
 const L_PILIH_HALO = 'pa-pilih-halo'
-// sorotan lokasi terpilih: oranye penanda di logo (sama dengan --pin di styles/app.css)
-const AKSEN = '#e0732f'
+// sorotan lokasi terpilih: teal logo (sama dengan --accent di styles/app.css), kontras dengan skala jingga
+const aksen = (gelap: boolean) => (gelap ? '#34b5a3' : '#13796f')
 const srcKonteks = (j: JenisLapis) => `pa-konteks-${j}`
 const lIsiKonteks = (j: JenisLapis) => `pa-konteks-${j}-isi`
 const lGarisKonteks = (j: JenisLapis) => `pa-konteks-${j}-garis`
@@ -151,7 +151,7 @@ function gambarArsir(tema: Tema): ImageData {
   c.width = n
   c.height = n
   const g = c.getContext('2d')!
-  g.strokeStyle = tema === 'dark' ? 'rgba(255,255,255,0.36)' : 'rgba(22,22,29,0.36)'
+  g.strokeStyle = tema === 'dark' ? 'rgba(255,255,255,0.36)' : 'rgba(15,29,51,0.36)'
   g.lineWidth = 1.4
   for (const o of [-16, -8, 0, 8, 16]) {
     g.beginPath()
@@ -167,7 +167,7 @@ function gayaCadangan(tema: Tema): StyleSpecification {
   return {
     version: 8,
     sources: {},
-    layers: [{ id: 'latar', type: 'background', paint: { 'background-color': tema === 'dark' ? '#101016' : '#eceef2' } }],
+    layers: [{ id: 'latar', type: 'background', paint: { 'background-color': tema === 'dark' ? '#0b1220' : '#e9edf3' } }],
   }
 }
 
@@ -263,7 +263,7 @@ function terapkanKonteks(map: PetaGL, s: Ringkas): void {
           layout: { 'line-join': 'round' },
           paint: bahaya
             ? { 'line-color': ekspr(['get', 'warna']), 'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 0.5, 15, 1.4]), 'line-opacity': 0.95 }
-            : { 'line-color': gelap ? 'rgba(255,255,255,0.55)' : 'rgba(22,22,29,0.45)', 'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 1.6]) },
+            : { 'line-color': gelap ? 'rgba(255,255,255,0.55)' : 'rgba(15,29,51,0.45)', 'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 1.6]) },
         },
         sebelum,
       )
@@ -305,8 +305,8 @@ function pasang(map: PetaGL, s: Ringkas): void {
         type: 'hillshade',
         source: SRC_DEM,
         paint: gelap
-          ? { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#000000', 'hillshade-highlight-color': 'rgba(176,164,255,0.26)', 'hillshade-accent-color': '#05050a' }
-          : { 'hillshade-exaggeration': 0.3, 'hillshade-shadow-color': '#3b3566', 'hillshade-highlight-color': 'rgba(255,255,255,0.55)', 'hillshade-accent-color': '#5b5675' },
+          ? { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#000000', 'hillshade-highlight-color': 'rgba(160,185,230,0.22)', 'hillshade-accent-color': '#050a14' }
+          : { 'hillshade-exaggeration': 0.3, 'hillshade-shadow-color': '#2b3a55', 'hillshade-highlight-color': 'rgba(255,255,255,0.55)', 'hillshade-accent-color': '#4f5b73' },
       },
       bawah,
     )
@@ -343,7 +343,7 @@ function pasang(map: PetaGL, s: Ringkas): void {
         type: 'line',
         source: SRC,
         paint: {
-          'line-color': gelap ? 'rgba(255,255,255,0.3)' : 'rgba(22,22,29,0.26)',
+          'line-color': gelap ? 'rgba(255,255,255,0.3)' : 'rgba(15,29,51,0.26)',
           'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.3]),
         },
       },
@@ -353,11 +353,11 @@ function pasang(map: PetaGL, s: Ringkas): void {
   // lapis redup: di atas piksel dan lapis konteks, di bawah jalan dan label peta dasar
   if (!map.getSource(SRC_REDUP)) map.addSource(SRC_REDUP, { type: 'geojson', data: KOSONG })
   if (!map.getLayer(L_REDUP)) {
-    map.addLayer({ id: L_REDUP, type: 'fill', source: SRC_REDUP, paint: { 'fill-color': gelap ? '#000000' : '#16161d', 'fill-opacity': opasitasRedup(s) } }, bawah)
+    map.addLayer({ id: L_REDUP, type: 'fill', source: SRC_REDUP, paint: { 'fill-color': gelap ? '#000000' : '#0f1d33', 'fill-opacity': opasitasRedup(s) } }, bawah)
   }
   terapkanKonteks(map, s)
   const tanpaPilihan = ['==', ['get', 'id'], '__tidak_ada__'] as ['==', ['get', string], string]
-  const luar = gelap ? '#0d0d12' : '#16161d'
+  const luar = gelap ? '#070c16' : '#0f1d33'
   // Bangunan 3D dari tile vektor peta dasar (OpenMapTiles: layer "building", atribut render_height).
   if (map.getSource('openmaptiles') && !map.getLayer(L_BANGUNAN)) {
     map.addLayer(
@@ -370,7 +370,7 @@ function pasang(map: PetaGL, s: Ringkas): void {
         filter: ['!=', ['get', 'hide_3d'], true],
         layout: { visibility: s.tigaD ? 'visible' : 'none' },
         paint: {
-          'fill-extrusion-color': gelap ? '#2c2c3a' : '#ffffff',
+          'fill-extrusion-color': gelap ? '#243149' : '#ffffff',
           'fill-extrusion-height': ekspr(['interpolate', ['linear'], ['zoom'], 13, 0, 14.2, ['coalesce', ['get', 'render_height'], 5]]),
           'fill-extrusion-base': ekspr(['coalesce', ['get', 'render_min_height'], 0]),
           'fill-extrusion-opacity': gelap ? 0.82 : 0.8,
@@ -389,7 +389,7 @@ function pasang(map: PetaGL, s: Ringkas): void {
         source: SRC,
         filter: tanpaPilihan,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': AKSEN, 'line-width': 16, 'line-blur': 12, 'line-opacity': gelap ? 0.55 : 0.7 },
+        paint: { 'line-color': aksen(gelap), 'line-width': 16, 'line-blur': 12, 'line-opacity': gelap ? 0.55 : 0.7 },
       },
       simbolPertama,
     )
@@ -402,7 +402,7 @@ function pasang(map: PetaGL, s: Ringkas): void {
   }
   if (!map.getLayer(L_PILIH)) {
     map.addLayer(
-      { id: L_PILIH, type: 'line', source: SRC, filter: tanpaPilihan, layout: { 'line-join': 'round' }, paint: { 'line-color': AKSEN, 'line-width': 2.6 } },
+      { id: L_PILIH, type: 'line', source: SRC, filter: tanpaPilihan, layout: { 'line-join': 'round' }, paint: { 'line-color': aksen(gelap), 'line-width': 2.6 } },
       simbolPertama,
     )
   }
@@ -413,7 +413,7 @@ function pasang(map: PetaGL, s: Ringkas): void {
     map.addLayer({ id: L_BLOK_LUAR, type: 'line', source: SRC_BLOK, layout: { 'line-join': 'round' }, paint: { 'line-color': luar, 'line-width': 6 } }, simbolPertama)
   }
   if (!map.getLayer(L_BLOK)) {
-    map.addLayer({ id: L_BLOK, type: 'line', source: SRC_BLOK, layout: { 'line-join': 'round' }, paint: { 'line-color': AKSEN, 'line-width': 2.8 } }, simbolPertama)
+    map.addLayer({ id: L_BLOK, type: 'line', source: SRC_BLOK, layout: { 'line-join': 'round' }, paint: { 'line-color': aksen(gelap), 'line-width': 2.8 } }, simbolPertama)
   }
 }
 
@@ -424,8 +424,8 @@ function terapkanMedan(map: PetaGL, tigaD: boolean, gelap: boolean): void {
     map.setTerrain({ source: SRC_DEM_3D, exaggeration: EKSAGERASI_3D })
     map.setSky(
       gelap
-        ? { 'sky-color': '#0b0b14', 'horizon-color': '#2a2350', 'fog-color': '#0d0d12', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.4 }
-        : { 'sky-color': '#cfd8f2', 'horizon-color': '#f3f1fb', 'fog-color': '#eceef2', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.35 },
+        ? { 'sky-color': '#08101d', 'horizon-color': '#1d2f52', 'fog-color': '#0b1220', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.4 }
+        : { 'sky-color': '#cddcf0', 'horizon-color': '#eef3fa', 'fog-color': '#e9edf3', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.35 },
     )
   } else if (map.getTerrain()) {
     map.setTerrain(null)

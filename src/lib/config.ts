@@ -23,12 +23,12 @@ export const LAJU_BIN_LABELS = ['< 2', '2–4', '4–6', '6–8', '> 8'] as cons
 
 /** Warna harus sama dengan token --ramp-* / --kat-* di styles/app.css. */
 export const RAMP: Record<Tema, string[]> = {
-  light: ['#dcd6fa', '#b6a8f3', '#8f7be8', '#6a4fd3', '#46289f'],
-  dark: ['#2f2a55', '#453c8a', '#5f51c0', '#8573e6', '#b9adf7'],
+  light: ['#f7e9cf', '#f1c27e', '#e48b45', '#c2552a', '#86301c'],
+  dark: ['#3a2b22', '#6b3f24', '#a65a2a', '#e07a3a', '#ffb46e'],
 }
 export const WARNA_KATEGORI: Record<Tema, Record<Kategori, string>> = {
-  light: { rendah: '#b6a8f3', sedang: '#7b62dd', tinggi: '#46289f', 'tidak-memadai': '#c9c9d1' },
-  dark: { rendah: '#5448ad', sedang: '#8573e6', tinggi: '#c3b9fa', 'tidak-memadai': '#3a3a46' },
+  light: { rendah: '#f0cf96', sedang: '#e08a46', tinggi: '#9e3a20', 'tidak-memadai': '#c8ced8' },
+  dark: { rendah: '#7a4a27', sedang: '#d06c32', tinggi: '#ffac66', 'tidak-memadai': '#33405a' },
 }
 
 export const LABEL_KATEGORI: Record<Kategori, string> = {

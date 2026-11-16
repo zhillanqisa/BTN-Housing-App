@@ -13,37 +13,41 @@
   --logo-green: #2e7d4f;
   --logo-pin: #d46a2c;
   --logo-pin-hole: #ffffff;
-  --bg: #f3f3f6;
-  --surface: #fcfcfd;
-  --surface-2: #f0f0f4;
-  --glass: rgb(252 252 253 / 0.88);
-  --ink: #16161d;
-  --ink-2: #4b4b59;
-  --ink-3: #6f6f7e;
-  --line: rgb(22 22 29 / 0.09);
-  --line-2: rgb(22 22 29 / 0.17);
+  /* Netral bernada navy logo. Kontras teks (WCAG): ink 15:1, ink-2 7:1, ink-3 4,6:1 di semua latar. */
+  --bg: #f1f4f8;
+  --surface: #fbfcfe;
+  --surface-2: #edf1f6;
+  --glass: rgb(251 252 254 / 0.88);
+  --ink: #0f1d33;
+  --ink-2: #44526a;
+  --ink-3: #5f6d84;
+  --line: rgb(15 29 51 / 0.09);
+  --line-2: rgb(15 29 51 / 0.17);
+  /* Aksen = teal logo (tombol utama, sorotan, penanda titik). Teks putih di atasnya 5,3:1. */
   --accent: #13796f;
   --accent-ink: #ffffff;
-  /* penanda lokasi di peta, oranye seperti penanda di logo */
+  /* oranye penanda di logo: ikon lokasi di pemilih wilayah */
   --pin: #d46a2c;
-  --data: #6a4fd3;
-  --data-soft: rgb(106 79 211 / 0.12);
-  /* Ramp laju (sekuensial, 5 kelas) dan kategori (ordinal, 3 kelas): tervalidasi */
-  --ramp-1: #dcd6fa;
-  --ramp-2: #b6a8f3;
-  --ramp-3: #8f7be8;
-  --ramp-4: #6a4fd3;
-  --ramp-5: #46289f;
-  --kat-rendah: #b6a8f3;
-  --kat-sedang: #7b62dd;
-  --kat-tinggi: #46289f;
-  --nodata: #c9c9d1;
+  /* Data = jingga tanah: laju turun makin tua makin cepat. Berlawanan dengan teal, jadi sorotan
+     dan tombol tetap menonjol di atas peta. */
+  --data: #b4501f;
+  --data-soft: rgb(180 80 31 / 0.12);
+  /* Ramp laju (sekuensial, 5 kelas): kecerahan L* 93, 81, 66, 50, 32, jarak merata */
+  --ramp-1: #f7e9cf;
+  --ramp-2: #f1c27e;
+  --ramp-3: #e48b45;
+  --ramp-4: #c2552a;
+  --ramp-5: #86301c;
+  --kat-rendah: #f0cf96;
+  --kat-sedang: #e08a46;
+  --kat-tinggi: #9e3a20;
+  --nodata: #c8ced8;
   --notice-bg: #fff3d1;
   --notice-ink: #5a4200;
   --notice-line: rgb(214 150 0 / 0.35);
-  --sh-panel: 0 1px 0 rgb(255 255 255 / 0.7) inset, 0 18px 48px -18px rgb(38 30 90 / 0.28),
-    0 2px 6px -2px rgb(38 30 90 / 0.1);
-  --sh-pop: 0 10px 30px -10px rgb(38 30 90 / 0.35);
+  --sh-panel: 0 1px 0 rgb(255 255 255 / 0.7) inset, 0 18px 48px -18px rgb(15 29 51 / 0.24),
+    0 2px 6px -2px rgb(15 29 51 / 0.08);
+  --sh-pop: 0 10px 30px -10px rgb(15 29 51 / 0.32);
 }
 
 :root[data-theme='dark'] {
@@ -52,30 +56,31 @@
   --logo-teal: #34b5a3;
   --logo-green: #4fa871;
   --logo-pin: #f0813f;
-  --logo-pin-hole: #16161d;
-  --bg: #0d0d12;
-  --surface: #16161d;
-  --surface-2: #1f1f29;
-  --glass: rgb(22 22 29 / 0.84);
-  --ink: #f2f2f6;
-  --ink-2: #babac8;
-  --ink-3: #9090a0;
+  --logo-pin-hole: #111b2d;
+  --bg: #0b1220;
+  --surface: #111b2d;
+  --surface-2: #18243a;
+  --glass: rgb(17 27 45 / 0.86);
+  --ink: #eef2f8;
+  --ink-2: #b7c2d3;
+  --ink-3: #8f9cb1;
   --line: rgb(255 255 255 / 0.09);
   --line-2: rgb(255 255 255 / 0.17);
   --accent: #34b5a3;
-  --accent-ink: #062019;
+  --accent-ink: #04201b;
   --pin: #f0813f;
-  --data: #9a8af0;
-  --data-soft: rgb(154 138 240 / 0.16);
-  --ramp-1: #2f2a55;
-  --ramp-2: #453c8a;
-  --ramp-3: #5f51c0;
-  --ramp-4: #8573e6;
-  --ramp-5: #b9adf7;
-  --kat-rendah: #5448ad;
-  --kat-sedang: #8573e6;
-  --kat-tinggi: #c3b9fa;
-  --nodata: #3a3a46;
+  --data: #f2924f;
+  --data-soft: rgb(242 146 79 / 0.16);
+  /* di tema gelap yang paling cepat turun paling terang: L* 19, 31, 46, 62, 79 */
+  --ramp-1: #3a2b22;
+  --ramp-2: #6b3f24;
+  --ramp-3: #a65a2a;
+  --ramp-4: #e07a3a;
+  --ramp-5: #ffb46e;
+  --kat-rendah: #7a4a27;
+  --kat-sedang: #d06c32;
+  --kat-tinggi: #ffac66;
+  --nodata: #33405a;
   --notice-bg: rgb(250 178 25 / 0.13);
   --notice-ink: #f6d58a;
   --notice-line: rgb(250 178 25 / 0.3);
@@ -255,7 +260,7 @@
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: var(--pin);
+  background: var(--accent);
   animation: pa-pulse 1.8s ease-out infinite;
 }
 .pa-marker::after {
@@ -263,8 +268,8 @@
   position: absolute;
   inset: 2px;
   border-radius: 999px;
-  background: var(--pin);
-  border: 3px solid #16161d;
+  background: var(--accent);
+  border: 3px solid #0f1d33;
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
 }
 
@@ -276,10 +281,10 @@
   max-width: 240px;
   padding: 6px 12px 6px 8px;
   border-radius: 999px;
-  background: #16161d;
+  background: #0f1d33;
   color: #fff;
   box-shadow:
-    0 0 0 2px var(--pin),
+    0 0 0 2px var(--accent),
     0 10px 24px rgb(0 0 0 / 0.28);
   pointer-events: none;
   white-space: nowrap;
@@ -291,8 +296,8 @@
   height: 8px;
   flex-shrink: 0;
   border-radius: 999px;
-  background: var(--pin);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--pin) 30%, transparent);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .pa-label-kel b {
   overflow: hidden;

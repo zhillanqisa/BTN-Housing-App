@@ -167,7 +167,7 @@ export default function TentangView() {
           {CARA_KERJA.map(({ Ikon, judul, isi }, i) => (
             <li key={judul} className="relative rounded-[18px] bg-surface-2 p-5">
               <div className="flex items-center justify-between">
-                <span className="grid size-10 place-items-center rounded-[12px] bg-surface text-data ring-1 ring-line">
+                <span className="grid size-10 place-items-center rounded-[12px] bg-surface text-accent ring-1 ring-line">
                   <Ikon size={21} weight="duotone" aria-hidden="true" />
                 </span>
                 <span className="tnum text-[13px] font-bold text-ink-3">0{i + 1}</span>
@@ -183,7 +183,7 @@ export default function TentangView() {
           <ul className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-5">
             {ISI_LAPORAN.map(({ Ikon, judul, isi }) => (
               <li key={judul} className="flex gap-3 lg:flex-col lg:gap-2">
-                <Ikon size={22} weight="duotone" className="shrink-0 text-data" aria-hidden="true" />
+                <Ikon size={22} weight="duotone" className="shrink-0 text-accent" aria-hidden="true" />
                 <span>
                   <span className="block text-[14.5px] font-bold text-ink">{judul}</span>
                   <span className="mt-0.5 block text-[13.5px] leading-snug text-ink-2">{isi}</span>
@@ -207,7 +207,7 @@ export default function TentangView() {
               return (
                 <div key={m.siapa} className={cx('flex flex-col rounded-[18px] p-5', gratis ? 'bg-surface-2' : 'border border-line-2')}>
                   <div className="flex items-center justify-between">
-                    <Ikon size={26} weight="duotone" className="text-data" aria-hidden="true" />
+                    <Ikon size={26} weight="duotone" className="text-accent" aria-hidden="true" />
                     <span className={cx('rounded-full px-2.5 py-1 text-[12px] font-bold', gratis ? 'bg-accent text-accent-ink' : 'bg-ink text-surface')}>{m.tarif}</span>
                   </div>
                   <div className="mt-4 text-[12.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{m.siapa}</div>
@@ -227,7 +227,7 @@ export default function TentangView() {
             <ul className="space-y-3">
               {SINERGI_BTN.map((s) => (
                 <li key={s} className="flex gap-2.5 text-[14px] leading-relaxed text-ink">
-                  <CheckCircle size={19} weight="fill" className="mt-0.5 shrink-0 text-data" aria-hidden="true" />
+                  <CheckCircle size={19} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
                   {s}
                 </li>
               ))}
@@ -235,7 +235,7 @@ export default function TentangView() {
           </div>
         </div>
 
-        <div id="kontak" className="bg-[#16161d] p-6 text-white md:p-9">
+        <div id="kontak" className="bg-[#0f1d33] p-6 text-white md:p-9">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-end">
             <div>
               <div className="text-[11.5px] font-bold uppercase tracking-[0.12em] text-white/60">Hubungi kami</div>
