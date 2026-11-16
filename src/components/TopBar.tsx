@@ -1,9 +1,10 @@
 // Bilah atas melayang: merek, pilihan wilayah, navigasi halaman, penanda data demo, dan tombol tema.
 // Di ponsel navigasi pindah ke bawah (NavBawah), jadi bilah atas hanya merek, wilayah, dan tema.
-import { BookOpenText, ChartBar, MapTrifold, Moon, Scales, Sun, Warning } from '@phosphor-icons/react'
+import { BookOpenText, ChartBar, MapTrifold, Moon, Question, Scales, Sun, UsersThree, Warning } from '@phosphor-icons/react'
 import { APP } from '../lib/config'
 import { navigasi } from '../lib/router'
 import { useApp } from '../lib/store'
+import { mulaiTur } from '../lib/tur'
 import type { Halaman } from '../lib/types'
 import { cx, IconButton, Logo, Wordmark } from '../ui/primitives'
 import PilihWilayah from './PilihWilayah'
@@ -12,8 +13,9 @@ import PilihWilayah from './PilihWilayah'
 export const MENU: { halaman: Halaman; label: string; singkat: string; Ikon: typeof MapTrifold }[] = [
   { halaman: 'peta', label: 'Cek lokasi', singkat: 'Peta', Ikon: MapTrifold },
   { halaman: 'bandingkan', label: 'Bandingkan', singkat: 'Banding', Ikon: Scales },
-  { halaman: 'dashboard', label: 'Dashboard', singkat: 'Dashboard', Ikon: ChartBar },
+  { halaman: 'dashboard', label: 'Dashboard', singkat: 'Dasbor', Ikon: ChartBar },
   { halaman: 'metode', label: 'Data & metode', singkat: 'Metode', Ikon: BookOpenText },
+  { halaman: 'tentang', label: 'Tentang kami', singkat: 'Tentang', Ikon: UsersThree },
 ]
 
 export default function TopBar({ halaman }: { halaman: Halaman }) {
@@ -26,15 +28,15 @@ export default function TopBar({ halaman }: { halaman: Halaman }) {
     <header className="pointer-events-none absolute inset-x-0 top-0 z-30 px-3 pt-[calc(12px+var(--geser-atas))] lg:px-4 lg:pt-4">
       <div className="glass pointer-events-auto flex h-14 items-center gap-1.5 rounded-[22px] pl-3 pr-2">
         <button type="button" onClick={() => navigasi('peta')} className="flex shrink-0 items-center gap-2.5 rounded-[12px] pr-2" aria-label={`${APP.nama}, ke halaman peta`}>
-          <Logo size={30} />
-          <Wordmark className="text-[16px] lg:text-[16.5px]" />
+          <Logo size={34} />
+          <Wordmark className="text-[17px] lg:text-[17.5px]" />
         </button>
 
         <div className="flex-1 lg:hidden" />
 
         <PilihWilayah />
 
-        <nav aria-label="Halaman" className="hidden min-w-0 flex-1 items-center justify-center gap-1 lg:flex">
+        <nav aria-label="Halaman" data-tur="nav" className="hidden min-w-0 flex-1 items-center justify-center gap-1 lg:flex">
           {MENU.map(({ halaman: h, label, Ikon }) => {
             const aktif = h === halaman
             return (
@@ -73,6 +75,9 @@ export default function TopBar({ halaman }: { halaman: Halaman }) {
             Data demo
           </button>
         )}
+        <IconButton label="Tur aplikasi" title="Tur aplikasi" onClick={mulaiTur}>
+          <Question size={18} />
+        </IconButton>
         <IconButton label={tema === 'dark' ? 'Ganti ke tema terang' : 'Ganti ke tema gelap'} onClick={() => setTema(tema === 'dark' ? 'light' : 'dark')}>
           {tema === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </IconButton>

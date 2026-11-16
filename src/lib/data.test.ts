@@ -238,6 +238,25 @@ describe('PDF Laporan Ambles', () => {
     expect(teks).toContain('Kepadatan')
     expect(teks).toMatch(/\/Count [23]\b/)
   })
+  it('lapis bahaya banjir tampil dengan tingkat bahaya dan penjelasannya', async () => {
+    const k = kawasan.find((x) => x.nama === 'Kaligawe')!
+    const banjir: KonteksPdf = {
+      jenis: 'banjir',
+      sumber: 'Indeks bahaya banjir (InaRISK BNPB), skala 100 m per piksel',
+      kode: 'tinggi',
+      nama: 'Tinggi',
+      warna: '#1d4f91',
+      peta: [{ nama: 'Tinggi', warna: '#1d4f91', cincin: [kotak(k.pusat, -0.004, -0.004, 0.004, 0.004)] }],
+    }
+    const blob = await buatLaporanPdf({
+      kawasan: k, kategori: klasifikasi(k.laju, k.memadai, { sedang: 2, tinggi: 4 }), tenor: 15, thresholds: { sedang: 2, tinggi: 4 }, meta: asli.dataset.metadata, label: 'Kaligawe', lngLat: k.pusat, gambarPeta: null,
+      konteks: [banjir],
+    })
+    const teks = new TextDecoder('latin1').decode(await blob.arrayBuffer())
+    expect(teks).toContain('BAHAYA BANJIR')
+    expect(teks).toContain('TINGKAT BAHAYA')
+    expect(teks).toContain('asuransi')
+  })
   it('laporan titik menyebut blok di sekitar titik, bukan kawasan', async () => {
     const k = kawasan.find((x) => x.nama === 'Kaligawe')!
     const blob = await buatLaporanPdf({

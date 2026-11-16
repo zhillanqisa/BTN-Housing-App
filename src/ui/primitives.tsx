@@ -9,25 +9,42 @@ export function cx(...a: (string | false | null | undefined)[]): string {
   return a.filter(Boolean).join(' ')
 }
 
-/** Tanda merek SubTen: rumah yang sudah turun di bawah muka tanah semula (garis putus),
- *  berdiri di muka tanah baru (lime). Sama dengan public/favicon.svg. */
-export function Logo({ size = 28 }: { size?: number }) {
+/** Geometri tanda merek SubTen (viewBox 64): rumah, penanda lokasi, dan dua lapisan tanah yang
+ *  melengkung turun. Sama dengan public/favicon.svg dan gambarLogo di lib/pdf.ts. */
+export const LOGO_PATH = {
+  rumah: 'M6 42V24.6L32 4.2l13 9.4',
+  jendela: [
+    [21, 23],
+    [28.6, 23],
+    [21, 30.6],
+    [28.6, 30.6],
+  ] as const,
+  penanda: 'M53 13.5a8.5 8.5 0 0 0-8.5 8.5c0 5.4 6.2 11.6 8.5 15.6 2.3-4 8.5-10.2 8.5-15.6a8.5 8.5 0 0 0-8.5-8.5Z',
+  tanahAtas: 'M6 47.5c8-3.3 15.5-3 22.5 1 3.2 1.8 5.5 1.6 8.3-.4 5.2-3.8 11.4-6.6 21.2-6.6',
+  tanahBawah: 'M6 55.5c8-3.3 15.5-3 22.5 1 3.2 1.8 5.5 1.6 8.3-.4 5.2-3.8 11.4-6.6 21.2-6.6',
+}
+
+/** Tanda merek SubTen. Warna dari token --logo-* (versi lebih terang di tema gelap). */
+export function Logo({ size = 32 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="9" fill="#16161d" />
-      <path d="M5.5 16.5h3.6M22.9 16.5h3.6" stroke="#f2f2f6" strokeOpacity="0.5" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M10 15.4 16 10l6 5.4V22H10z" fill="#f2f2f6" />
-      <rect x="14.6" y="18" width="2.8" height="4" rx="0.6" fill="#16161d" />
-      <rect x="6" y="22.6" width="20" height="3" rx="1.5" fill="#c6f135" />
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <path d={LOGO_PATH.rumah} strokeWidth="4.6" style={{ stroke: 'var(--logo-ink)' }} />
+      {LOGO_PATH.jendela.map(([x, y]) => (
+        <rect key={`${x}-${y}`} x={x} y={y} width="5.6" height="5.6" rx="1.1" style={{ fill: 'var(--logo-ink)' }} />
+      ))}
+      <path d={LOGO_PATH.tanahAtas} strokeWidth="4.4" style={{ stroke: 'var(--logo-teal)' }} />
+      <path d={LOGO_PATH.tanahBawah} strokeWidth="4.4" style={{ stroke: 'var(--logo-green)' }} />
+      <path d={LOGO_PATH.penanda} style={{ fill: 'var(--logo-pin)' }} />
+      <circle cx="53" cy="22" r="3" style={{ fill: 'var(--logo-pin-hole)' }} />
     </svg>
   )
 }
 
-/** Nama produk: "Sub" dan "Ten" dibedakan tipis supaya kepanjangannya terbaca. */
+/** Nama produk: "Sub" dan "Ten" dalam dua warna merek supaya kepanjangannya terbaca. */
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cx('font-extrabold tracking-tight text-ink', className)}>
-      Sub<span className="text-ink-2">Ten</span>
+    <span className={cx('font-extrabold tracking-tight', className)} style={{ color: 'var(--logo-ink)' }}>
+      Sub<span style={{ color: 'var(--logo-teal)' }}>Ten</span>
     </span>
   )
 }

@@ -150,4 +150,4 @@ export interface TitikBanding {
 
 export type Tema = 'light' | 'dark'
 export type ModePeta = 'laju' | 'kategori'
-export type Halaman = 'peta' | 'bandingkan' | 'dashboard' | 'metode'
+export type Halaman = 'peta' | 'bandingkan' | 'dashboard' | 'metode' | 'tentang'

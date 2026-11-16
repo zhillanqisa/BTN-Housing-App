@@ -11,11 +11,12 @@ import ReportPanel from './components/ReportPanel'
 import SearchBox from './components/SearchBox'
 import Sorotan from './components/Sorotan'
 import TopBar from './components/TopBar'
+import TurAplikasi from './components/TurAplikasi'
 import { DEFAULT_TENOR, TENORS } from './lib/config'
 import { useLayarKecil } from './lib/layar'
 import { kunciTitik, LABEL_TITIK } from './lib/lokasi'
-import { bacaRute, navigasi, useRute } from './lib/router'
-import { adalahIdWilayah, DAFTAR_WILAYAH, wilayahById, wilayahDiTitik } from './lib/wilayah'
+import { bacaRute, kunciRute, navigasi, useRute } from './lib/router'
+import { adalahIdWilayah, DAFTAR_WILAYAH, wilayahById, wilayahDariTautan, wilayahDiTitik } from './lib/wilayah'
 import { useApp } from './lib/store'
 import type { Position, Tenor } from './lib/types'
 import { Button, cx, Notice, Panel, Skeleton } from './ui/primitives'
@@ -23,6 +24,7 @@ import { Button, cx, Notice, Panel, Skeleton } from './ui/primitives'
 const DashboardView = lazy(() => import('./views/DashboardView'))
 const CompareView = lazy(() => import('./views/CompareView'))
 const MethodView = lazy(() => import('./views/MethodView'))
+const TentangView = lazy(() => import('./views/TentangView'))
 
 function Intro() {
   const status = useApp((s) => s.status)
@@ -115,7 +117,7 @@ function LapisanPeta() {
   const kecil = useLayarKecil()
   return (
     <>
-      <div className="absolute inset-x-3 top-[calc(76px+var(--geser-atas))] z-[11] lg:inset-x-auto lg:left-4 lg:top-[88px] lg:w-[408px]">
+      <div data-tur="cari" className="absolute inset-x-3 top-[calc(76px+var(--geser-atas))] z-[11] lg:inset-x-auto lg:left-4 lg:top-[88px] lg:w-[408px]">
         <SearchBox />
       </div>
 
@@ -151,6 +153,8 @@ export default function App() {
   const adaGrid = useApp((s) => !!s.grid)
   const wilayah = useApp((s) => s.wilayah)
   const sudahBaca = useRef(false)
+  // kunciRute dari tautan terakhir yang sudah dibaca efek tautan -> state
+  const ruteTerbaca = useRef<string | null>(null)
 
   useEffect(() => {
     // wilayah awal dari tautan: parameter w, atau wilayah yang memuat titik ll
@@ -167,12 +171,18 @@ export default function App() {
   useEffect(() => {
     if (status !== 'siap' || halaman !== 'peta') return
     const s = useApp.getState()
-    // tautan ke wilayah lain (ditempel saat aplikasi terbuka): pindah wilayah dulu, efek ini jalan lagi setelahnya
-    const w = rute.params.get('w')
-    if (adalahIdWilayah(w) && w !== s.wilayah) {
+    // Efek ini juga jalan saat status kembali 'siap' sesudah pengguna memilih wilayah lain, sementara
+    // tautan masih membawa w dan titik (ll/k) wilayah lama. Tautan yang sudah dibaca tidak dibaca
+    // lagi: membacanya ulang menarik aplikasi kembali ke wilayah lama atau memilih ulang titik lama.
+    if (kunciRute(rute) === ruteTerbaca.current) return
+    // Tautan ke wilayah lain (ditempel saat aplikasi terbuka): pindah wilayah dulu, lalu efek ini
+    // jalan lagi setelah data wilayah itu siap dan membaca titiknya.
+    const w = wilayahDariTautan(rute, ruteTerbaca.current, s.wilayah)
+    if (w) {
       void s.pilihWilayah(w)
       return
     }
+    ruteTerbaca.current = kunciRute(rute)
     const k = rute.params.get('k')
     const ll = rute.params.get('ll')
     const bacaTenor = () => {
@@ -237,12 +247,21 @@ export default function App() {
             }
           >
             {/* key: filter kecamatan dan pilihan baris milik wilayah lama, jadi diatur ulang saat pindah wilayah */}
-            {halaman === 'dashboard' ? <DashboardView key={wilayah} /> : halaman === 'bandingkan' ? <CompareView /> : <MethodView />}
+            {halaman === 'dashboard' ? (
+              <DashboardView key={wilayah} />
+            ) : halaman === 'bandingkan' ? (
+              <CompareView />
+            ) : halaman === 'tentang' ? (
+              <TentangView />
+            ) : (
+              <MethodView />
+            )}
           </Suspense>
         </main>
       )}
       <TopBar halaman={halaman} />
       <NavBawah halaman={halaman} />
+      <TurAplikasi />
     </div>
   )
 }

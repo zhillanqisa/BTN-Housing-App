@@ -1,12 +1,18 @@
 /* SubTen: token desain dan gaya dasar.
    Aturan bentuk: panel 22px, kontrol 12px, pil/chip bulat penuh.
-   Satu aksen (lime). Violet HANYA untuk data (ramp laju/kategori). */
+   Warna merek mengikuti logo: aksen teal, penanda lokasi oranye. Violet HANYA untuk data (ramp laju/kategori). */
 @import 'tailwindcss';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 :root {
   color-scheme: light;
+  /* warna merek SubTen (logo dan nama) */
+  --logo-ink: #12305a;
+  --logo-teal: #13796f;
+  --logo-green: #2e7d4f;
+  --logo-pin: #d46a2c;
+  --logo-pin-hole: #ffffff;
   --bg: #f3f3f6;
   --surface: #fcfcfd;
   --surface-2: #f0f0f4;
@@ -16,8 +22,10 @@
   --ink-3: #6f6f7e;
   --line: rgb(22 22 29 / 0.09);
   --line-2: rgb(22 22 29 / 0.17);
-  --accent: #c6f135;
-  --accent-ink: #18210a;
+  --accent: #13796f;
+  --accent-ink: #ffffff;
+  /* penanda lokasi di peta, oranye seperti penanda di logo */
+  --pin: #d46a2c;
   --data: #6a4fd3;
   --data-soft: rgb(106 79 211 / 0.12);
   /* Ramp laju (sekuensial, 5 kelas) dan kategori (ordinal, 3 kelas): tervalidasi */
@@ -40,6 +48,11 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
+  --logo-ink: #e9eef7;
+  --logo-teal: #34b5a3;
+  --logo-green: #4fa871;
+  --logo-pin: #f0813f;
+  --logo-pin-hole: #16161d;
   --bg: #0d0d12;
   --surface: #16161d;
   --surface-2: #1f1f29;
@@ -49,8 +62,9 @@
   --ink-3: #9090a0;
   --line: rgb(255 255 255 / 0.09);
   --line-2: rgb(255 255 255 / 0.17);
-  --accent: #c6f135;
-  --accent-ink: #18210a;
+  --accent: #34b5a3;
+  --accent-ink: #062019;
+  --pin: #f0813f;
   --data: #9a8af0;
   --data-soft: rgb(154 138 240 / 0.16);
   --ramp-1: #2f2a55;
@@ -184,6 +198,18 @@
   .pa-enter {
     animation: pa-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+  /* Tur aplikasi: lubang sorotan dengan cincin aksen; bayangan raksasa meredupkan sisa layar. */
+  .pa-tur-sorot {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 30px 6px color-mix(in srgb, var(--accent) 40%, transparent),
+      0 0 0 200vmax rgb(8 8 14 / 0.62);
+    transition:
+      left 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+      top 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+      width 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+      height 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  }
   .pa-fade {
     animation: pa-fade 0.3s ease both;
   }
@@ -229,7 +255,7 @@
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--pin);
   animation: pa-pulse 1.8s ease-out infinite;
 }
 .pa-marker::after {
@@ -237,7 +263,7 @@
   position: absolute;
   inset: 2px;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--pin);
   border: 3px solid #16161d;
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
 }
@@ -253,7 +279,7 @@
   background: #16161d;
   color: #fff;
   box-shadow:
-    0 0 0 2px var(--accent),
+    0 0 0 2px var(--pin),
     0 10px 24px rgb(0 0 0 / 0.28);
   pointer-events: none;
   white-space: nowrap;
@@ -265,8 +291,8 @@
   height: 8px;
   flex-shrink: 0;
   border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px rgb(198 241 53 / 0.25);
+  background: var(--pin);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--pin) 30%, transparent);
 }
 .pa-label-kel b {
   overflow: hidden;

@@ -74,6 +74,12 @@ export const SKALA_DAYA: { nilai: DayaTanah; label: string }[] = [
   { nilai: 'sedang', label: 'Sedang' },
   { nilai: 'lunak', label: 'Lunak' },
 ]
+/** Kelas indeks bahaya BNPB (lapis banjir dan abrasi). */
+export const SKALA_BAHAYA: { nilai: 'rendah' | 'sedang' | 'tinggi'; label: string }[] = [
+  { nilai: 'rendah', label: 'Rendah' },
+  { nilai: 'sedang', label: 'Sedang' },
+  { nilai: 'tinggi', label: 'Tinggi' },
+]
 
 /** Langkah mencocokkan persil di BHUMI. */
 export const LANGKAH_PERSIL = ['Buka peta BHUMI', 'Cari titik ini (koordinat sudah disalin)', 'Cocokkan bidang dan NIB dengan sertifikat']

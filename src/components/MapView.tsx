@@ -11,7 +11,7 @@ import { geojsonPeta } from '../lib/data'
 import { fmt } from '../lib/format'
 import { mergeBBox, polygonsOf } from '../lib/geo'
 import { batasBlok, lukisGrid, nilaiDi, type Grid, type RGBA } from '../lib/grid'
-import { JENIS_LAPIS, konteksDi, LABEL_LAPIS, type JenisLapis, type LapisKonteks } from '../lib/konteks'
+import { JENIS_LAPIS, konteksDi, LABEL_LAPIS, lapisBahaya, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { geserAtasPx, layarKecil, PECAHAN_SEDANG } from '../lib/layar'
 import { binLaju, klasifikasi } from '../lib/risk'
 import { jembatanPeta, kawasanById, useApp } from '../lib/store'
@@ -38,10 +38,20 @@ const L_BLOK = 'pa-blok-garis'
 const SRC_REDUP = 'pa-redup'
 const L_REDUP = 'pa-redup-isi'
 const L_PILIH_HALO = 'pa-pilih-halo'
-const AKSEN = '#c6f135'
+// sorotan lokasi terpilih: oranye penanda di logo (sama dengan --pin di styles/app.css)
+const AKSEN = '#e0732f'
 const srcKonteks = (j: JenisLapis) => `pa-konteks-${j}`
 const lIsiKonteks = (j: JenisLapis) => `pa-konteks-${j}-isi`
 const lGarisKonteks = (j: JenisLapis) => `pa-konteks-${j}-garis`
+const lPendarKonteks = (j: JenisLapis) => `pa-konteks-${j}-pendar`
+// Relief bayangan dan medan 3D dari ubin elevasi terbuka (Mapzen Terrain Tiles di AWS Open Data).
+// Dua sumber terpisah: MapLibre menyarankan sumber berbeda untuk hillshade dan terrain.
+const DEM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+const DEM_ATRIBUSI = '<a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener">Relief © Mapzen</a>'
+const SRC_DEM = 'pa-dem'
+const SRC_DEM_3D = 'pa-dem-3d'
+const L_RELIEF = 'pa-relief'
+const EKSAGERASI_3D = 1.6
 const OPASITAS_GRID = { biasa: { light: 0.76, dark: 0.82 }, konteks: { light: 0.3, dark: 0.34 } }
 
 const ekspr = (e: unknown) => e as ExpressionSpecification
@@ -170,6 +180,15 @@ function bantalan(laporan = false): PaddingOptions {
   return { left: 24, top: 150 + atas, right: 64, bottom: Math.min(bawah, window.innerHeight - 260 - atas) }
 }
 
+/** Paskan kotak ke layar dengan bantalan(). Bantalan yang tersimpan di kamera (dari flyTo ke titik
+ *  terpilih, di ponsel bawahnya 56% layar) dinolkan dulu: MapLibre menjumlahkannya dengan bantalan
+ *  baru, dan di ponsel jumlahnya melebihi tinggi layar sehingga fitBounds batal diam-diam
+ *  ("Map cannot fit within canvas"), dan peta tertinggal di lokasi lama. */
+function pasKotak(map: PetaGL, kotak: BBox, pitch: number, duration: number) {
+  map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 })
+  map.fitBounds([[kotak[0], kotak[1]], [kotak[2], kotak[3]]], { padding: bantalan(), pitch, bearing: MAP.bearing, duration })
+}
+
 interface Ringkas {
   kawasan: Kawasan[]
   grid: Grid | null
@@ -210,8 +229,30 @@ function terapkanKonteks(map: PetaGL, s: Ringkas): void {
     }
     // di bawah lapis redup, supaya sorotan kelurahan tetap bekerja
     const sebelum = map.getLayer(L_REDUP) ? L_REDUP : undefined
+    const bahaya = lapisBahaya(j)
     if (!map.getLayer(lIsiKonteks(j))) {
-      map.addLayer({ id: lIsiKonteks(j), type: 'fill', source: src, paint: { 'fill-color': ekspr(['get', 'warna']), 'fill-opacity': gelap ? 0.5 : 0.56 } }, sebelum)
+      map.addLayer(
+        { id: lIsiKonteks(j), type: 'fill', source: src, paint: { 'fill-color': ekspr(['get', 'warna']), 'fill-opacity': bahaya ? (gelap ? 0.46 : 0.5) : gelap ? 0.5 : 0.56, 'fill-antialias': true } },
+        sebelum,
+      )
+    }
+    // lapis bahaya: pendar lembut di tepi kelas, lalu garis tipis berwarna kelas (tanpa garis gelap yang keras)
+    if (bahaya && !map.getLayer(lPendarKonteks(j))) {
+      map.addLayer(
+        {
+          id: lPendarKonteks(j),
+          type: 'line',
+          source: src,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color': ekspr(['get', 'warna']),
+            'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 3, 15, 12]),
+            'line-blur': ekspr(['interpolate', ['linear'], ['zoom'], 10, 3, 15, 10]),
+            'line-opacity': gelap ? 0.55 : 0.45,
+          },
+        },
+        sebelum,
+      )
     }
     if (!map.getLayer(lGarisKonteks(j))) {
       map.addLayer(
@@ -220,7 +261,9 @@ function terapkanKonteks(map: PetaGL, s: Ringkas): void {
           type: 'line',
           source: src,
           layout: { 'line-join': 'round' },
-          paint: { 'line-color': gelap ? 'rgba(255,255,255,0.55)' : 'rgba(22,22,29,0.45)', 'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 1.6]) },
+          paint: bahaya
+            ? { 'line-color': ekspr(['get', 'warna']), 'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 0.5, 15, 1.4]), 'line-opacity': 0.95 }
+            : { 'line-color': gelap ? 'rgba(255,255,255,0.55)' : 'rgba(22,22,29,0.45)', 'line-width': ekspr(['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 1.6]) },
         },
         sebelum,
       )
@@ -228,6 +271,7 @@ function terapkanKonteks(map: PetaGL, s: Ringkas): void {
     const tampil = s.lapisKonteks === j ? 'visible' : 'none'
     map.setLayoutProperty(lIsiKonteks(j), 'visibility', tampil)
     map.setLayoutProperty(lGarisKonteks(j), 'visibility', tampil)
+    if (map.getLayer(lPendarKonteks(j))) map.setLayoutProperty(lPendarKonteks(j), 'visibility', tampil)
   }
   if (map.getLayer(L_GRID)) map.setPaintProperty(L_GRID, 'raster-opacity', opasitasGrid(s))
   // saat lapis konteks tampil, redupan di luar kelurahan dibuat tipis supaya warna kelasnya tetap terbaca
@@ -251,6 +295,23 @@ function pasang(map: PetaGL, s: Ringkas): void {
 
   if (!map.hasImage(ARSIR)) map.addImage(ARSIR, gambarArsir(s.tema))
   if (!map.getSource(SRC)) map.addSource(SRC, { type: 'geojson', data: geojsonPeta(s.kawasan), promoteId: 'id' })
+
+  // Relief bayangan tipis di bawah semua lapis data: perbukitan terlihat timbul, dataran pantai tetap rata.
+  if (!map.getSource(SRC_DEM)) map.addSource(SRC_DEM, { type: 'raster-dem', tiles: [DEM_URL], tileSize: 256, maxzoom: 14, encoding: 'terrarium', attribution: DEM_ATRIBUSI })
+  if (!map.getLayer(L_RELIEF)) {
+    map.addLayer(
+      {
+        id: L_RELIEF,
+        type: 'hillshade',
+        source: SRC_DEM,
+        paint: gelap
+          ? { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#000000', 'hillshade-highlight-color': 'rgba(176,164,255,0.26)', 'hillshade-accent-color': '#05050a' }
+          : { 'hillshade-exaggeration': 0.3, 'hillshade-shadow-color': '#3b3566', 'hillshade-highlight-color': 'rgba(255,255,255,0.55)', 'hillshade-accent-color': '#5b5675' },
+      },
+      bawah,
+    )
+  }
+  terapkanMedan(map, s.tigaD, gelap)
 
   if (s.grid && !map.getSource(SRC_GRID)) {
     map.addSource(SRC_GRID, { type: 'image', url: gambarGrid(s.grid, s.modePeta, s.tema, s.thresholds), coordinates: sudutGrid(s.grid) })
@@ -353,6 +414,21 @@ function pasang(map: PetaGL, s: Ringkas): void {
   }
   if (!map.getLayer(L_BLOK)) {
     map.addLayer({ id: L_BLOK, type: 'line', source: SRC_BLOK, layout: { 'line-join': 'round' }, paint: { 'line-color': AKSEN, 'line-width': 2.8 } }, simbolPertama)
+  }
+}
+
+/** Medan dan langit untuk tampilan 3D. Di 2D medan dimatikan: peta datar lebih tajam dan ringan. */
+function terapkanMedan(map: PetaGL, tigaD: boolean, gelap: boolean): void {
+  if (tigaD) {
+    if (!map.getSource(SRC_DEM_3D)) map.addSource(SRC_DEM_3D, { type: 'raster-dem', tiles: [DEM_URL], tileSize: 256, maxzoom: 14, encoding: 'terrarium' })
+    map.setTerrain({ source: SRC_DEM_3D, exaggeration: EKSAGERASI_3D })
+    map.setSky(
+      gelap
+        ? { 'sky-color': '#0b0b14', 'horizon-color': '#2a2350', 'fog-color': '#0d0d12', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.4 }
+        : { 'sky-color': '#cfd8f2', 'horizon-color': '#f3f1fb', 'fog-color': '#eceef2', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.35 },
+    )
+  } else if (map.getTerrain()) {
+    map.setTerrain(null)
   }
 }
 
@@ -517,7 +593,7 @@ export default function MapView({ aktif }: { aktif: boolean }) {
     jembatanPeta.aturUlang = () => {
       const s = useApp.getState()
       const kotak = mergeBBox(s.kawasan.map((k) => k.bbox))
-      if (kotak) map.fitBounds([[kotak[0], kotak[1]], [kotak[2], kotak[3]]], { padding: bantalan(), pitch: s.tigaD ? MAP.pitch : 0, bearing: MAP.bearing, duration: 900 })
+      if (kotak) pasKotak(map, kotak, s.tigaD ? MAP.pitch : 0, 900)
     }
     jembatanPeta.ambilGambar = () => {
       try {
@@ -578,11 +654,26 @@ export default function MapView({ aktif }: { aktif: boolean }) {
       wilayahPas.current = w
       const kotak = kawasan.length ? mergeBBox(kawasan.map((k) => k.bbox)) : (wilayahById(w)?.bbox ?? null)
       if (kotak && !useApp.getState().selection) {
-        map.fitBounds([[kotak[0], kotak[1]], [kotak[2], kotak[3]]], { padding: bantalan(), pitch: tigaD ? MAP.pitch : 0, bearing: MAP.bearing, duration: pertama ? 0 : 1600 })
+        pasKotak(map, kotak, tigaD ? MAP.pitch : 0, pertama ? 0 : 1600)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versiData, gayaKe])
+
+  // ---------- pindah wilayah: kamera langsung ke wilayah baru, tanpa menunggu datanya ----------
+  // Kotak wilayah di wilayah.ts sama dengan batas datanya, jadi efek data di atas tidak memaskan
+  // ulang. Pemasangan pertama (wilayahPas masih null) tetap diurus efek data.
+  useEffect(() => {
+    const map = peta.current
+    if (!map || wilayahPas.current === null || wilayahPas.current === wilayah) return
+    const kotak = wilayahById(wilayah)?.bbox
+    if (!kotak) return
+    wilayahPas.current = wilayah
+    // titik terpilih yang tetap berlaku di wilayah baru: kamera tetap di titik itu
+    if (useApp.getState().selection) return
+    pasKotak(map, kotak, tigaD ? MAP.pitch : 0, 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wilayah])
 
   // ---------- warna (mode, ambang, tema) dan lapis piksel ----------
   useEffect(() => {
@@ -598,6 +689,7 @@ export default function MapView({ aktif }: { aktif: boolean }) {
     if (!map || !map.getLayer(L_ISI)) return
     if (map.getLayer(L_BANGUNAN)) map.setLayoutProperty(L_BANGUNAN, 'visibility', tigaD ? 'visible' : 'none')
     if (map.getLayer('building')) map.setLayoutProperty('building', 'visibility', tigaD && map.getLayer(L_BANGUNAN) ? 'none' : 'visible')
+    terapkanMedan(map, tigaD, useApp.getState().tema === 'dark')
     map.easeTo({ pitch: tigaD ? MAP.pitch : 0, duration: 600 })
   }, [tigaD, gayaKe])
 

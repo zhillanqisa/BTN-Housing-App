@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { fmt, fmtKoordinat, fmtPeriode, rentang, slug } from './format'
 import { areaKm2, bboxOf, haversineKm, inBBox, pointInGeometry, pusatOf } from './geo'
 import { binLaju, hitungKategori, hitungProyeksi, kalimatProyeksi, kalimatStatus, klasifikasi, langkahBerikutnya, teksProyeksi } from './risk'
-import { bacaRute, buatHash } from './router'
+import { bacaRute, buatHash, kunciRute } from './router'
 import type { Kategori, KawasanGeometry, Thresholds } from './types'
+import { wilayahDariTautan } from './wilayah'
 
 const T: Thresholds = { sedang: 2, tinggi: 4 }
 
@@ -153,5 +154,23 @@ describe('router', () => {
     expect(buatHash('peta', { k: 'a', t: null })).toBe('#/?k=a')
     const r = bacaRute(buatHash('peta', { k: 'osm-9', t: 10 }))
     expect([r.halaman, r.params.get('k'), r.params.get('t')]).toEqual(['peta', 'osm-9', '10'])
+  })
+  it('tautan w= yang sudah dibaca tidak menarik balik wilayah yang baru dipilih', () => {
+    // Pengguna di Semarang (#/?w=semarang sudah dibaca) memilih Jakarta. Selama Jakarta dimuat,
+    // tautan masih w=semarang. Tautan itu tidak boleh memindahkan aplikasi kembali ke Semarang.
+    const lama = bacaRute('#/?w=semarang')
+    expect(wilayahDariTautan(lama, kunciRute(lama), 'jakarta')).toBeNull()
+    // tautan baru yang ditempel saat aplikasi terbuka tetap memindahkan wilayah
+    const baru = bacaRute('#/?w=jakarta&ll=-6.12,106.80')
+    expect(wilayahDariTautan(baru, kunciRute(lama), 'semarang')).toBe('jakarta')
+    // tautan ke wilayah yang sedang aktif, atau tanpa w yang sah, tidak memindahkan apa pun
+    expect(wilayahDariTautan(baru, null, 'jakarta')).toBeNull()
+    expect(wilayahDariTautan(bacaRute('#/?w=bandung'), null, 'semarang')).toBeNull()
+    expect(wilayahDariTautan(bacaRute('#/dashboard'), null, 'semarang')).toBeNull()
+  })
+  it('kunci rute membedakan halaman dan parameter', () => {
+    expect(kunciRute(bacaRute('#/?w=semarang'))).toBe(kunciRute(bacaRute('#/?w=semarang')))
+    expect(kunciRute(bacaRute('#/?w=semarang'))).not.toBe(kunciRute(bacaRute('#/?w=jakarta')))
+    expect(kunciRute(bacaRute('#/dashboard'))).not.toBe(kunciRute(bacaRute('#/')))
   })
 })

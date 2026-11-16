@@ -7,11 +7,11 @@ import { ArrowSquareOut, Check, CircleNotch, DownloadSimple, LinkSimple, MapPin,
 import { batasan, MAKS_BANDING, PRINSIP, TENORS } from '../lib/config'
 import { fmt, fmtKoordinat, fmtPeriode } from '../lib/format'
 import { lebarBlokM } from '../lib/grid'
-import { JENIS_LAPIS, KODE_ALUVIUM, konteksDi, LABEL_LAPIS, lapisTataRuang, statFitur, type FiturKonteks, type JenisLapis, type LapisKonteks } from '../lib/konteks'
+import { adalahTingkatBahaya, JENIS_LAPIS, KODE_ALUVIUM, konteksDi, LABEL_LAPIS, lapisBahaya, lapisTataRuang, statFitur, type FiturKonteks, type JenisLapis, type LapisKonteks } from '../lib/konteks'
 import { kunciTitik, LABEL_TITIK } from '../lib/lokasi'
 import { polygonsOf } from '../lib/geo'
-import { LANGKAH_PERSIL, penampang, RADIUS_PETA_MINI_M, SKALA_DAYA, SKALA_HUNIAN } from '../lib/penampang'
-import { BHUMI, penjelasanGeologi, penjelasanPolaRuang, penjelasanSubzona, PERSIL_CATATAN, PERSIL_RINGKAS } from '../lib/penjelasan'
+import { LANGKAH_PERSIL, penampang, RADIUS_PETA_MINI_M, SKALA_BAHAYA, SKALA_DAYA, SKALA_HUNIAN } from '../lib/penampang'
+import { BHUMI, penjelasanBahaya, penjelasanGeologi, penjelasanPolaRuang, penjelasanSubzona, PERSIL_CATATAN, PERSIL_RINGKAS } from '../lib/penjelasan'
 import { kalimatStatus, klasifikasi, langkahBerikutnya, teksLaju } from '../lib/risk'
 import { navigasi } from '../lib/router'
 import { jembatanPeta, useApp, useBacaan } from '../lib/store'
@@ -225,12 +225,16 @@ function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: Lap
   const pr = ruang ? penjelasanPolaRuang(f.kode, f.zona ?? f.nama) : null
   const subzona = ruang ? penjelasanSubzona(f.nama) : null
   const geo = jenis === 'geologi' ? penjelasanGeologi(f.kode) : null
+  const tingkat = lapisBahaya(jenis) && adalahTingkatBahaya(f.kode) ? f.kode : null
+  const bh = tingkat && lapisBahaya(jenis) ? penjelasanBahaya(jenis, tingkat) : null
   const beda = !!f.zona && f.zona !== f.nama
   const keterangan = ruang
     ? [beda ? `Zona ${f.zona}` : null, f.fungsi ?? (pr ? `Kawasan ${pr.golongan.toLowerCase()}` : null)].filter(Boolean).join(' · ')
     : geo
       ? geo.umur.split(',')[0]
-      : ''
+      : bh
+        ? 'Indeks bahaya BNPB'
+        : ''
   return (
     <div className="rounded-[14px] bg-surface-2 p-3">
       <div className="flex items-center justify-between gap-2">
@@ -257,6 +261,7 @@ function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: Lap
           <PenampangTanah data={penampang(geo.daya, f.warna, f.nama)} />
         </>
       )}
+      {tingkat && <StripSkala judul="Tingkat bahaya" opsi={SKALA_BAHAYA} aktif={tingkat} waspada={tingkat === 'tinggi'} />}
 
       {f.batuan && <p className="mt-2.5 text-[12.5px] leading-snug text-ink-2">{f.batuan}.</p>}
       {bacaan && <p className="mt-1 text-[12.5px] font-semibold leading-snug text-ink">{bacaan}</p>}
@@ -284,6 +289,13 @@ function BarisKonteks({ jenis, lapis, f, laju }: { jenis: JenisLapis; lapis: Lap
               ))}
             </ul>
           </Rincian>
+        </>
+      )}
+      {bh && (
+        <>
+          <Rincian judul="Artinya">{bh.arti}</Rincian>
+          <Rincian judul="Untuk membeli rumah">{bh.untukRumah}</Rincian>
+          <Rincian judul="Kaitan dengan ambles">{bh.ambles}</Rincian>
         </>
       )}
       <p className="mt-2.5 text-[11.5px] leading-snug text-ink-3">
@@ -370,7 +382,7 @@ export function DaftarKonteks({ baris, laju, lngLat }: { baris: ReturnType<typeo
 function KonteksLokasi({ lngLat, laju }: { lngLat: Position; laju: number | null }) {
   const baris = useBarisKonteks(lngLat)
   return (
-    <div className="border-t border-line pt-4">
+    <div data-tur="lap-konteks" className="scroll-mt-3 border-t border-line pt-4">
       <JudulBagian>Konteks lokasi</JudulBagian>
       <div className="mt-2">
         <DaftarKonteks baris={baris} laju={laju} lngLat={lngLat} />
@@ -458,7 +470,7 @@ export default function ReportPanel() {
               </Notice>
             )}
 
-            <div>
+            <div data-tur="lap-status" className="scroll-mt-3">
               <JudulBagian kanan={<KategoriBadge kategori={kategori} />}>{titik ? 'Status di titik ini' : 'Status kawasan'}</JudulBagian>
               {adaData ? (
                 <div className="mt-2 flex items-baseline gap-2">
@@ -479,12 +491,12 @@ export default function ReportPanel() {
 
             {adaData ? (
               <>
-                <div className="border-t border-line pt-4">
+                <div data-tur="lap-riwayat" className="scroll-mt-3 border-t border-line pt-4">
                   <JudulBagian kanan={periode ? <span className="text-[12px] text-ink-3">{periode}</span> : undefined}>Riwayat</JudulBagian>
                   <div className="mt-2">{memuatDeret ? <Skeleton className="h-[132px] w-full" /> : <HistoryChart deret={k.deret} />}</div>
                 </div>
 
-                <div className="border-t border-line pt-4">
+                <div data-tur="lap-proyeksi" className="scroll-mt-3 border-t border-line pt-4">
                   <JudulBagian
                     kanan={
                       <Segmented
@@ -528,7 +540,7 @@ export default function ReportPanel() {
 
       {k && (
         <footer className="border-t border-line px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div data-tur="lap-aksi" className="flex items-center gap-2">
             <Button varian="accent" className="min-w-0 flex-1" onClick={unduh} disabled={sibuk} ikon={sibuk ? <CircleNotch size={17} className="animate-spin" /> : <DownloadSimple size={17} weight="bold" />}>
               {sibuk ? 'Menyiapkan PDF' : 'Unduh PDF'}
             </Button>

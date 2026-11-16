@@ -1,15 +1,50 @@
 // Tes lapis konteks: validasi file, pencarian kelas di titik, dan statistik.
 import { describe, expect, it } from 'vitest'
 import rdtrMentah from '../../public/data/pekalongan-konteks-rdtr.geojson?raw'
+import abrasiMentah from '../../public/data/semarang-konteks-abrasi.geojson?raw'
+import banjirMentah from '../../public/data/semarang-konteks-banjir.geojson?raw'
 import geologiMentah from '../../public/data/semarang-konteks-geologi.geojson?raw'
 import rtrwMentah from '../../public/data/semarang-konteks-rtrw.geojson?raw'
-import { KODE_ALUVIUM, konteksDi, statFitur, statKelas, validasiKonteks, type LapisKonteks } from './konteks'
-import { penjelasanPolaRuang, penjelasanSubzona } from './penjelasan'
+import { adalahTingkatBahaya, KODE_ALUVIUM, konteksDi, lapisBahaya, lapisTataRuang, statFitur, statKelas, validasiKonteks, type LapisKonteks } from './konteks'
+import { penjelasanBahaya, penjelasanPolaRuang, penjelasanSubzona } from './penjelasan'
 import type { Position } from './types'
 
 const rtrw = validasiKonteks(JSON.parse(rtrwMentah), 'rtrw')
 const rdtr = validasiKonteks(JSON.parse(rdtrMentah), 'rdtr')
 const geologi = validasiKonteks(JSON.parse(geologiMentah), 'geologi')
+const banjir = validasiKonteks(JSON.parse(banjirMentah), 'banjir')
+const abrasi = validasiKonteks(JSON.parse(abrasiMentah), 'abrasi')
+
+describe('lapis bahaya InaRISK BNPB', () => {
+  it('jenis lapis: bahaya terpisah dari tata ruang', () => {
+    expect(lapisBahaya('banjir') && lapisBahaya('abrasi')).toBe(true)
+    expect(lapisTataRuang('banjir') || lapisTataRuang('abrasi') || lapisTataRuang('geologi')).toBe(false)
+    expect(lapisTataRuang('rdtr') && lapisTataRuang('rtrw')).toBe(true)
+    expect(lapisBahaya('geologi')).toBe(false)
+  })
+  it('kelas bahaya BNPB dengan sumber InaRISK, statistik per kelas, dan penjelasan untuk pembeli', () => {
+    for (const [j, l] of [
+      ['banjir', banjir],
+      ['abrasi', abrasi],
+    ] as const) {
+      expect(l).not.toBeNull()
+      expect(l!.meta.sumber[0]?.nama).toContain('InaRISK')
+      expect(l!.meta.statistik.length).toBe(l!.fitur.length)
+      for (const f of l!.fitur) {
+        expect(adalahTingkatBahaya(f.kode)).toBe(true)
+        expect(f.warna).toMatch(/^#[0-9a-f]{6}$/i)
+        expect(statFitur(l, f)).toBeDefined()
+        if (adalahTingkatBahaya(f.kode)) expect(penjelasanBahaya(j, f.kode).arti.length).toBeGreaterThan(20)
+      }
+    }
+  })
+  it('Kaligawe di dataran banjir tinggi, Tembalang di perbukitan tanpa bahaya banjir, pantai Marina di jalur abrasi', () => {
+    expect(konteksDi(banjir, [110.4486, -6.9563])?.kode).toBe('tinggi')
+    expect(konteksDi(banjir, [110.438, -7.056])).toBeNull()
+    expect(konteksDi(abrasi, [110.39, -6.948])?.kode).toBe('tinggi')
+    expect(konteksDi(abrasi, [110.4486, -6.9563])).toBeNull()
+  })
+})
 
 const zonaDi = (l: LapisKonteks) => new Set(l.fitur.map((f) => f.zona ?? f.nama))
 

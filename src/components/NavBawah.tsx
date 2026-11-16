@@ -10,7 +10,7 @@ export default function NavBawah({ halaman }: { halaman: Halaman }) {
   const nBanding = useApp((s) => s.banding.length)
   return (
     <nav aria-label="Halaman" className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] px-3 pb-[max(10px,env(safe-area-inset-bottom))] lg:hidden">
-      <div className="glass pointer-events-auto mx-auto flex h-[62px] max-w-[520px] items-stretch gap-1 rounded-[22px] p-1.5">
+      <div data-tur="nav" className="glass pointer-events-auto mx-auto flex h-[62px] max-w-[520px] items-stretch gap-1 rounded-[22px] p-1.5">
         {MENU.map(({ halaman: h, label, singkat, Ikon }) => {
           const aktif = h === halaman
           return (

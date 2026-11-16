@@ -65,7 +65,7 @@ export default function PilihWilayah() {
   }
 
   return (
-    <div ref={akar} className="relative shrink-0">
+    <div ref={akar} data-tur="wilayah" className="relative shrink-0">
       <button
         ref={tombol}
         type="button"
@@ -80,7 +80,7 @@ export default function PilihWilayah() {
           buka ? 'border-ink bg-surface text-ink' : 'border-line-2 bg-surface/70 text-ink hover:border-ink-3 hover:bg-surface',
         )}
       >
-        <MapPin size={16} weight="fill" className="text-accent" aria-hidden="true" />
+        <MapPin size={16} weight="fill" className="text-[var(--pin)]" aria-hidden="true" />
         <span className="max-w-[92px] truncate sm:max-w-none">{aktif?.singkat}</span>
         {status === 'memuat' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ink-3" aria-hidden="true" />}
         <CaretDown size={13} weight="bold" className={cx('text-ink-3 transition-transform duration-200', buka && 'rotate-180')} aria-hidden="true" />

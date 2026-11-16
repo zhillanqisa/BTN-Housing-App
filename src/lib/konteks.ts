@@ -1,20 +1,33 @@
-// Lapis konteks di atas peta laju: zona RDTR, pola ruang RTRW, dan geologi permukaan.
-// File ditulis oleh pipeline/07_konteks.py. Ketiga lapis memakai skema yang sama:
-// GeoJSON FeatureCollection, properti kode/nama/warna per fitur, dan metadata berisi
+// Lapis konteks di atas peta laju: zona RDTR, pola ruang RTRW, geologi permukaan, dan bahaya
+// banjir serta gelombang ekstrem dan abrasi (InaRISK BNPB).
+// File ditulis oleh pipeline/07_konteks.py dan pipeline/07c_bahaya.py. Semua lapis memakai skema
+// yang sama: GeoJSON FeatureCollection, properti kode/nama/warna per fitur, dan metadata berisi
 // sumber, catatan, serta statistik laju penurunan per kelas (per zona untuk RDTR dan RTRW).
 import { bboxOf, inBBox, pointInGeometry } from './geo'
 import type { BBox, KawasanGeometry, Position, SumberData } from './types'
 
-export type JenisLapis = 'rdtr' | 'rtrw' | 'geologi'
+export type JenisLapis = 'rdtr' | 'rtrw' | 'geologi' | 'banjir' | 'abrasi'
 /** Urutan tampil: RDTR paling rinci dan paling menentukan izin bangunan, jadi didahulukan. */
-export const JENIS_LAPIS: JenisLapis[] = ['rdtr', 'rtrw', 'geologi']
+export const JENIS_LAPIS: JenisLapis[] = ['rdtr', 'rtrw', 'geologi', 'banjir', 'abrasi']
 
-export const LABEL_LAPIS: Record<JenisLapis, string> = { rdtr: 'Zona RDTR', rtrw: 'Pola ruang RTRW', geologi: 'Geologi permukaan' }
+export const LABEL_LAPIS: Record<JenisLapis, string> = {
+  rdtr: 'Zona RDTR',
+  rtrw: 'Pola ruang RTRW',
+  geologi: 'Geologi permukaan',
+  banjir: 'Bahaya banjir',
+  abrasi: 'Bahaya gelombang dan abrasi',
+}
 /** Label pendek untuk tombol pilihan lapis. */
-export const LABEL_SINGKAT: Record<JenisLapis, string> = { rdtr: 'RDTR', rtrw: 'RTRW', geologi: 'Geologi' }
+export const LABEL_SINGKAT: Record<JenisLapis, string> = { rdtr: 'RDTR', rtrw: 'RTRW', geologi: 'Geologi', banjir: 'Banjir', abrasi: 'Abrasi' }
 
-/** Lapis rencana tata ruang (bukan geologi). */
-export const lapisTataRuang = (j: JenisLapis): j is 'rdtr' | 'rtrw' => j !== 'geologi'
+/** Lapis rencana tata ruang. */
+export const lapisTataRuang = (j: JenisLapis): j is 'rdtr' | 'rtrw' => j === 'rdtr' || j === 'rtrw'
+/** Lapis indeks bahaya InaRISK BNPB. */
+export const lapisBahaya = (j: JenisLapis): j is 'banjir' | 'abrasi' => j === 'banjir' || j === 'abrasi'
+
+/** Kelas indeks bahaya BNPB (kode fitur lapis bahaya). */
+export type TingkatBahaya = 'rendah' | 'sedang' | 'tinggi'
+export const adalahTingkatBahaya = (s: string): s is TingkatBahaya => s === 'rendah' || s === 'sedang' || s === 'tinggi'
 
 /** Laju penurunan (cm/tahun, positif = turun) di dalam satu kelas, dihitung dari grid aplikasi. */
 export interface StatKelas {

@@ -5,8 +5,9 @@ import type { jsPDF as JsPdf } from 'jspdf'
 import { APP, batasan, LABEL_KATEGORI, TENORS, WARNA_KATEGORI } from './config'
 import { unduhBerkas } from './data'
 import { fmt, fmtKoordinat, fmtPeriode, fmtTanggal, slug } from './format'
-import { CATATAN_PENAMPANG, LANGKAH_PERSIL, penampang as susunPenampang, RADIUS_PETA_MINI_M, SKALA_DAYA, SKALA_HUNIAN, type Penampang } from './penampang'
-import { BHUMI, penjelasanGeologi, penjelasanPolaRuang, penjelasanSubzona, PERSIL_CATATAN, PERSIL_RINGKAS } from './penjelasan'
+import { adalahTingkatBahaya, lapisBahaya, lapisTataRuang, type JenisLapis } from './konteks'
+import { CATATAN_PENAMPANG, LANGKAH_PERSIL, penampang as susunPenampang, RADIUS_PETA_MINI_M, SKALA_BAHAYA, SKALA_DAYA, SKALA_HUNIAN, type Penampang } from './penampang'
+import { BHUMI, penjelasanBahaya, penjelasanGeologi, penjelasanPolaRuang, penjelasanSubzona, PERSIL_CATATAN, PERSIL_RINGKAS } from './penjelasan'
 import { hitungProyeksi, kalimatProyeksi, kalimatStatus, langkahBerikutnya, teksLaju, teksProyeksi } from './risk'
 import type { DatasetMeta, Kategori, Kawasan, Position, Tenor, Thresholds } from './types'
 
@@ -26,8 +27,24 @@ export interface DataLaporanPdf {
   konteks?: KonteksPdf[]
 }
 
+/** Judul bagian dan label sumber per lapis konteks. */
+const JUDUL_KONTEKS: Record<JenisLapis, string> = {
+  rdtr: 'ZONA RDTR',
+  rtrw: 'POLA RUANG RTRW',
+  geologi: 'GEOLOGI PERMUKAAN',
+  banjir: 'BAHAYA BANJIR',
+  abrasi: 'BAHAYA GELOMBANG EKSTREM DAN ABRASI',
+}
+const SUMBER_KONTEKS: Record<JenisLapis, string> = {
+  rdtr: 'zona RDTR (rencana, bukan guna lahan saat ini)',
+  rtrw: 'pola ruang RTRW (rencana peruntukan, bukan guna lahan saat ini)',
+  geologi: 'geologi',
+  banjir: 'bahaya banjir (model nasional BNPB, bukan catatan kejadian)',
+  abrasi: 'bahaya gelombang ekstrem dan abrasi (model nasional BNPB)',
+}
+
 export interface KonteksPdf {
-  jenis: 'rdtr' | 'rtrw' | 'geologi'
+  jenis: JenisLapis
   /** Judul dan skala sumber, mis. "Peta Geologi Lembar Jakarta, 1:100.000". */
   sumber: string
   kode: string
@@ -121,35 +138,50 @@ function alat(doc: JsPdf) {
   return { teks, lebarTeks, bungkus, paragraf, judul }
 }
 
-/** Tanda merek SubTen (sama dengan Logo di ui/primitives.tsx, viewBox 32). */
+/** Warna merek SubTen (sama dengan token --logo-* di styles/app.css, tema terang). */
+const MEREK = { tinta: [18, 48, 90] as RGB, teal: [19, 121, 111] as RGB, hijau: [46, 125, 79] as RGB, penanda: [212, 106, 44] as RGB }
+
+/** Tanda merek SubTen dalam vektor PDF (geometri sama dengan LOGO_PATH di ui/primitives.tsx, viewBox 64). */
 function gambarLogo(doc: JsPdf, x: number, y: number, s: number): void {
-  const k = s / 32
-  doc.setFillColor(22, 22, 29)
-  doc.roundedRect(x, y, s, s, 9 * k, 9 * k, 'F')
-  doc.setDrawColor(150, 150, 160)
-  doc.setLineWidth(1.8 * k)
+  const k = s / 64
+  const skala = (seg: number[][]) => seg.map((p) => p.map((v) => v * k))
   doc.setLineCap('round')
-  doc.line(x + 5.5 * k, y + 16.5 * k, x + 9.1 * k, y + 16.5 * k)
-  doc.line(x + 22.9 * k, y + 16.5 * k, x + 26.5 * k, y + 16.5 * k)
+  doc.setLineJoin('round')
+  // rumah: dinding kiri dan atap, terbuka di kanan tempat penanda
+  doc.setDrawColor(...MEREK.tinta)
+  doc.setLineWidth(4.6 * k)
+  doc.lines(skala([[0, -17.4], [26, -20.4], [13, 9.4]]), x + 6 * k, y + 42 * k, [1, 1], 'S', false)
+  doc.setFillColor(...MEREK.tinta)
+  for (const [jx, jy] of [[21, 23], [28.6, 23], [21, 30.6], [28.6, 30.6]] as const) doc.roundedRect(x + jx * k, y + jy * k, 5.6 * k, 5.6 * k, 1.1 * k, 1.1 * k, 'F')
+  // dua lapisan tanah yang melengkung turun
+  const lengkung = [
+    [8, -3.3, 15.5, -3, 22.5, 1],
+    [3.2, 1.8, 5.5, 1.6, 8.3, -0.4],
+    [5.2, -3.8, 11.4, -6.6, 21.2, -6.6],
+  ]
+  doc.setLineWidth(4.4 * k)
+  doc.setDrawColor(...MEREK.teal)
+  doc.lines(skala(lengkung), x + 6 * k, y + 47.5 * k, [1, 1], 'S', false)
+  doc.setDrawColor(...MEREK.hijau)
+  doc.lines(skala(lengkung), x + 6 * k, y + 55.5 * k, [1, 1], 'S', false)
+  // penanda lokasi
+  doc.setFillColor(...MEREK.penanda)
+  doc.circle(x + 53 * k, y + 22 * k, 8.5 * k, 'F')
+  doc.triangle(x + 45.4 * k, y + 25.6 * k, x + 60.6 * k, y + 25.6 * k, x + 53 * k, y + 37.6 * k, 'F')
+  doc.setFillColor(255, 255, 255)
+  doc.circle(x + 53 * k, y + 22 * k, 3 * k, 'F')
   doc.setLineCap('butt')
-  doc.setFillColor(242, 242, 246)
-  doc.lines(
-    [
-      [6 * k, -5.4 * k],
-      [6 * k, 5.4 * k],
-      [0, 6.6 * k],
-      [-12 * k, 0],
-    ],
-    x + 10 * k,
-    y + 15.4 * k,
-    [1, 1],
-    'F',
-    true,
-  )
-  doc.setFillColor(22, 22, 29)
-  doc.rect(x + 14.6 * k, y + 18 * k, 2.8 * k, 4 * k, 'F')
-  doc.setFillColor(198, 241, 53)
-  doc.roundedRect(x + 6 * k, y + 22.6 * k, 20 * k, 3 * k, 1.5 * k, 1.5 * k, 'F')
+  doc.setLineJoin('miter')
+}
+
+/** Nama produk dua warna: "Sub" biru tua, "Ten" teal, seperti di logo. */
+function gambarNama(doc: JsPdf, x: number, y: number, ukuran: number): void {
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(ukuran)
+  doc.setTextColor(...MEREK.tinta)
+  doc.text('Sub', x, y)
+  doc.setTextColor(...MEREK.teal)
+  doc.text('Ten', x + doc.getTextWidth('Sub'), y)
 }
 
 function langkahRapi(rentang: number): number {
@@ -199,6 +231,7 @@ function gambarGrafik(doc: JsPdf, a: ReturnType<typeof alat>, deret: [number, nu
 export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+  doc.setProperties({ title: `Laporan Ambles SubTen: ${d.label}`, subject: `${APP.tagline}`, creator: 'SubTen', author: 'SubTen' })
   const a = alat(doc)
   const { kawasan: k, kategori, tenor, thresholds: t, meta } = d
   const adaData = k.memadai && k.laju != null
@@ -207,8 +240,8 @@ export async function buatLaporanPdf(d: DataLaporanPdf): Promise<Blob> {
   const diSini = titik ? 'di sekitar titik ini' : 'di kawasan ini'
 
   // ---- kepala ----
-  gambarLogo(doc, M, 15.5, 11)
-  a.teks(APP.nama, M + 14, 21, { ukuran: 14, tebal: true })
+  gambarLogo(doc, M, 15, 12)
+  gambarNama(doc, M + 14, 21, 14)
   a.teks(`${APP.tagline} · ${APP.kepanjangan}`, M + 14, 26, { ukuran: 9, warna: ABU })
   a.teks('Laporan Ambles', W - M, 21, { ukuran: 11, tebal: true, rata: 'right' })
   a.teks(`Dicetak ${fmtTanggal(new Date())}`, W - M, 26, { ukuran: 8.5, warna: ABU, rata: 'right' })
@@ -431,7 +464,7 @@ function gambarPetaMini(doc: JsPdf, a: ReturnType<typeof alat>, x: number, y: nu
   const [px, py] = keMm([0, 0])
   doc.setFillColor(255, 255, 255)
   doc.circle(px, py, 2.2, 'F')
-  doc.setFillColor(198, 241, 53)
+  doc.setFillColor(...MEREK.penanda)
   doc.setDrawColor(22, 22, 29)
   doc.setLineWidth(0.5)
   doc.circle(px, py, 1.4, 'FD')
@@ -577,8 +610,8 @@ function gambarLangkah(doc: JsPdf, a: ReturnType<typeof alat>, x: number, y: num
 function halamanKonteks(doc: JsPdf, a: ReturnType<typeof alat>, d: DataLaporanPdf, label: string): void {
   doc.addPage()
   const kepala = () => {
-    gambarLogo(doc, M, 13, 8)
-    a.teks(APP.nama, M + 10.5, 18.6, { ukuran: 11, tebal: true })
+    gambarLogo(doc, M, 12.6, 8.4)
+    gambarNama(doc, M + 10.5, 18.6, 11)
     a.teks(`Laporan Ambles: ${label}`, W - M, 18.6, { ukuran: 8.5, warna: ABU, rata: 'right' })
     doc.setDrawColor(...GARIS)
     doc.setLineWidth(0.3)
@@ -649,7 +682,7 @@ function halamanKonteks(doc: JsPdf, a: ReturnType<typeof alat>, d: DataLaporanPd
   for (const kx of d.konteks ?? []) {
     pastikan(80)
     const yAwal = y
-    a.judul(kx.jenis === 'rdtr' ? 'ZONA RDTR' : kx.jenis === 'rtrw' ? 'POLA RUANG RTRW' : 'GEOLOGI PERMUKAAN', y)
+    a.judul(JUDUL_KONTEKS[kx.jenis], y)
     const beda = !!kx.zona && kx.zona !== kx.nama
     a.teks(kx.jenis === 'geologi' && kx.kode ? `${kx.nama}  (${kx.kode})` : kx.nama, M, y + 6, { ukuran: 12.5, tebal: true })
     if (beda) {
@@ -663,7 +696,18 @@ function halamanKonteks(doc: JsPdf, a: ReturnType<typeof alat>, d: DataLaporanPd
     const yKiri = kx.peta?.length ? gambarPetaMini(doc, a, M, yBaris, PETA, d.lngLat, kx.peta, kx.zona ?? kx.nama) : yBaris
     // kolom kanan: skala dan visual utama
     let yKn = yBaris + 2.5
-    if (kx.jenis !== 'geologi') {
+    if (lapisBahaya(kx.jenis)) {
+      if (adalahTingkatBahaya(kx.kode)) {
+        const bh = penjelasanBahaya(kx.jenis, kx.kode)
+        yKn = gambarStrip(doc, a, xKanan, yKn, wKanan, 'Tingkat bahaya  ·  indeks BNPB', SKALA_BAHAYA, kx.kode, kx.kode === 'tinggi') + 2
+        y = yKn
+        sub('Artinya', bh.arti, xKanan, wKanan)
+        sub('Untuk membeli rumah', bh.untukRumah, xKanan, wKanan)
+        sub('Kaitan dengan ambles', bh.ambles, xKanan, wKanan)
+        yKn = y
+      }
+      y = Math.max(yKiri, yKn) + 1
+    } else if (lapisTataRuang(kx.jenis)) {
       const pr = penjelasanPolaRuang(kx.kode, kx.zona ?? kx.nama)
       const subzona = penjelasanSubzona(kx.nama)
       if (pr) {
@@ -690,9 +734,7 @@ function halamanKonteks(doc: JsPdf, a: ReturnType<typeof alat>, d: DataLaporanPd
       }
     }
     if (y < yAwal) y = yAwal
-    const jenisSumber =
-      kx.jenis === 'rdtr' ? 'zona RDTR (rencana, bukan guna lahan saat ini)' : kx.jenis === 'rtrw' ? 'pola ruang RTRW (rencana peruntukan, bukan guna lahan saat ini)' : 'geologi'
-    sumberKonteks.push(`${jenisSumber}: ${kx.sumber}`)
+    sumberKonteks.push(`${SUMBER_KONTEKS[kx.jenis]}: ${kx.sumber}`)
     garisPemisah()
   }
 

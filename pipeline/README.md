@@ -13,6 +13,7 @@ PA_WILAYAH=jakarta python pipeline/01_cari_pasangan.py --lintasan asc
 # ... langkah 2 sampai 6 sama seperti di bawah, semuanya dengan PA_WILAYAH yang sama
 PA_WILAYAH=jakarta python pipeline/07b_geologi_lembar.py   # Semarang: 07a_digitasi_geologi.py
 PA_WILAYAH=jakarta python pipeline/07_konteks.py
+PA_WILAYAH=jakarta python pipeline/07c_bahaya.py           # bahaya banjir dan abrasi InaRISK BNPB
 node scripts/ringkasan-wilayah.mjs                         # kartu perbandingan di Dashboard
 ```
 
@@ -75,6 +76,7 @@ Semua langkah sudah dijalankan penuh pada 14 November 2026.
 | 6. Ekspor grid dan ringkasan kelurahan | `06_ekspor.py` | 49.830 piksel terukur, 177 kelurahan |
 | 7a. Digitasi peta geologi PSG | `07a_digitasi_geologi.py` | 7 satuan batuan di dalam kota |
 | 7. Lapis konteks: zona RDTR, pola ruang RTRW, dan geologi | `07_konteks.py` | Semarang: 17 zona RTRW Kota (39 sub-zona), 7 satuan geologi, statistik laju per zona dan satuan |
+| 7c. Bahaya banjir dan abrasi (InaRISK BNPB) | `07c_bahaya.py` | Semarang: banjir rendah 7,8, sedang 70,6, tinggi 33,4 km²; abrasi 7,4 km² di jalur pantai |
 
 `status_hyp3.py` menampilkan status job di HyP3 dan sisa kredit.
 
@@ -168,6 +170,7 @@ python pipeline/05_vertikal_validasi.py
 python pipeline/06_ekspor.py
 python pipeline/07a_digitasi_geologi.py
 python pipeline/07_konteks.py
+python pipeline/07c_bahaya.py
 ```
 
 `02_pesan_hyp3.py` tanpa `--kirim` hanya memeriksa akses, sisa kredit, dan biaya. Dengan `--kirim` barulah memesan. Aman diulang: pasangan yang sudah dipesan tidak dipesan lagi.

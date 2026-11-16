@@ -18,7 +18,7 @@ const TANPA_TITIK: Position = [0, 0]
 
 function Bagian({ id, judul, kanan, children }: { id: string; judul: string; kanan?: ReactNode; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-judul`} className="border-t border-line px-5 py-5">
+    <section id={id} data-tur={id} aria-labelledby={`${id}-judul`} className="scroll-mt-2 border-t border-line px-5 py-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 id={`${id}-judul`} className="text-[16px] font-bold tracking-tight text-ink">
           {judul}
@@ -55,7 +55,7 @@ function Ringkas({ L }: { L: Laporan }) {
   const laju = Math.max(0, k.laju!)
   const p = hitungProyeksi(laju, k.sigma ?? 0, tenor)
   return (
-    <div className="relative overflow-hidden rounded-[18px] p-4" style={{ background: `color-mix(in srgb, ${warnaKategori(kategori)} 20%, var(--surface))` }}>
+    <div data-tur="lap-status" className="relative overflow-hidden rounded-[18px] p-4" style={{ background: `color-mix(in srgb, ${warnaKategori(kategori)} 20%, var(--surface))` }}>
       <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5" style={{ background: warnaKategori(kategori) }} />
       <div className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
@@ -234,7 +234,7 @@ export default function LaporanMobile() {
                 {titik && ` Sebagai konteks, rata-rata Kelurahan ${kel!.nama}: ${rataKelurahan}. Itu rata-rata kawasan, bukan angka di titik ini.`}
               </Notice>
             )}
-            <div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-2">
+            <div data-tur="lap-aksi" className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-2">
               <Button
                 varian="accent"
                 className="w-full"

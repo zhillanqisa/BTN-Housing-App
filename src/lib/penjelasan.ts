@@ -303,6 +303,68 @@ export function penjelasanGeologi(kode: string): PenjelasanGeologi | null {
   return null
 }
 
+// ---------------------------------------------------------------- bahaya (InaRISK BNPB)
+
+export interface PenjelasanBahaya {
+  arti: string
+  untukRumah: string
+  /** Kaitan bahaya ini dengan penurunan tanah. */
+  ambles: string
+}
+
+type Tingkat = 'rendah' | 'sedang' | 'tinggi'
+type TeksTingkat = Pick<PenjelasanBahaya, 'arti' | 'untukRumah'>
+
+const PANTAI_SEDANG_TINGGI =
+  'Hindari rumah di tepi pantai tanpa tanggul atau sabuk mangrove. Tanyakan apakah garis pantai di depan kawasan ini pernah mundur beberapa tahun terakhir.'
+
+const BAHAYA: Record<'banjir' | 'abrasi', { ambles: string; tingkat: Record<Tingkat, TeksTingkat> }> = {
+  banjir: {
+    ambles:
+      'Tanah yang terus turun memperbesar bahaya banjir dan rob dari tahun ke tahun: permukaan tanah makin dekat ke muka laut dan saluran kehilangan kemiringan. Model BNPB tidak memperhitungkan penurunan tanah ini.',
+    tingkat: {
+      rendah: {
+        arti: 'Model nasional BNPB menilai potensi banjir di sel 100 m ini rendah.',
+        untukRumah:
+          'Tetap tanyakan riwayat genangan saat hujan deras. Model nasional tidak menangkap saluran yang tersumbat atau cekungan kecil di satu jalan.',
+      },
+      sedang: {
+        arti: 'Potensi banjir sedang: sel ini berada di dataran yang bisa tergenang saat hujan lebat atau sungai meluap.',
+        untukRumah:
+          'Tanyakan seberapa sering dan seberapa tinggi genangan dalam lima tahun terakhir, dan pastikan lantai rumah lebih tinggi dari jalan di depannya.',
+      },
+      tinggi: {
+        arti: 'Potensi banjir tinggi: menurut model, sel ini berada di dataran rendah yang mudah tergenang.',
+        untukRumah:
+          'Pastikan lantai sudah cukup ditinggikan dan kawasan ini punya drainase atau polder yang berfungsi. Tanyakan riwayat genangan ke warga sekitar, bukan hanya ke penjual, dan pertimbangkan asuransi banjir.',
+      },
+    },
+  },
+  abrasi: {
+    ambles: 'Di pantai yang tanahnya turun, gelombang dan rob masuk makin jauh ke daratan, dan abrasi makin cepat.',
+    tingkat: {
+      rendah: {
+        arti: 'Potensi gelombang ekstrem dan abrasi di jalur pantai ini rendah.',
+        untukRumah: 'Tanyakan jarak rumah ke garis pantai dan apakah ada tanggul atau sabuk mangrove di depannya.',
+      },
+      sedang: {
+        arti: 'Potensi gelombang ekstrem dan abrasi sedang: garis pantai di sini bisa tergerus saat gelombang tinggi.',
+        untukRumah: PANTAI_SEDANG_TINGGI,
+      },
+      tinggi: {
+        arti: 'Potensi gelombang ekstrem dan abrasi tinggi: garis pantai di sini rawan tergerus dan diterjang gelombang.',
+        untukRumah: PANTAI_SEDANG_TINGGI,
+      },
+    },
+  },
+}
+
+/** Penjelasan kelas indeks bahaya BNPB untuk lapis banjir atau abrasi. */
+export function penjelasanBahaya(jenis: 'banjir' | 'abrasi', tingkat: Tingkat): PenjelasanBahaya {
+  const b = BAHAYA[jenis]
+  return { ...b.tingkat[tingkat], ambles: b.ambles }
+}
+
 // ---------------------------------------------------------------- persil
 
 /** BHUMI ATR/BPN: peta bidang tanah terdaftar. Tidak punya layanan peta terbuka untuk aplikasi lain,

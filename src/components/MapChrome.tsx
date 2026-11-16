@@ -12,31 +12,90 @@ import { navigasi } from '../lib/router'
 import { jembatanPeta, useApp } from '../lib/store'
 import type { ModePeta, Position } from '../lib/types'
 import { wilayahDiTitik } from '../lib/wilayah'
-import { IconButton, Panel, Segmented, Swatch } from '../ui/primitives'
+import { cx, IconButton, Panel, Segmented, Swatch } from '../ui/primitives'
 
-type PilihanLapis = 'tidak' | JenisLapis
+/** Golongan tiap lapis, ditulis di bawah namanya pada kartu pilihan lapis. */
+const GOLONGAN: Record<JenisLapis, string> = { rdtr: 'Tata ruang', rtrw: 'Tata ruang', geologi: 'Batuan', banjir: 'Bahaya BNPB', abrasi: 'Bahaya BNPB' }
+
+/** Warna kelas lapis untuk pratinjau di kartu: empat kelas terluas (urutan statistik). */
+function warnaPratinjau(l: LapisKonteks): string[] {
+  const sumber = l.meta.statistik.length ? l.meta.statistik : l.fitur
+  return [...new Set(sumber.map((s) => s.warna))].slice(0, 4)
+}
+
+/** Kartu pilihan lapis konteks: satu kartu per lapis yang tersedia, ketuk lagi untuk mematikan. */
+function PilihLapis() {
+  const konteks = useApp((s) => s.konteks)
+  const aktif = useApp((s) => s.lapisKonteks)
+  const setLapisKonteks = useApp((s) => s.setLapisKonteks)
+  const ada = JENIS_LAPIS.filter((j) => konteks[j])
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-semibold text-ink-2">Lapis konteks</span>
+        {aktif && (
+          <button type="button" onClick={() => setLapisKonteks(null)} className="text-[11.5px] font-semibold text-ink-3 underline-offset-2 hover:text-ink hover:underline">
+            Matikan
+          </button>
+        )}
+      </div>
+      <div role="group" aria-label="Lapis konteks" className="mt-2 grid grid-cols-3 gap-1.5">
+        {ada.map((j) => {
+          const pilih = aktif === j
+          return (
+            <button
+              key={j}
+              type="button"
+              aria-pressed={pilih}
+              onClick={() => setLapisKonteks(pilih ? null : j)}
+              className={cx(
+                'flex min-w-0 flex-col items-start gap-1.5 rounded-[12px] border px-2.5 pb-2 pt-2.5 text-left transition-[background-color,border-color,box-shadow] duration-200',
+                pilih ? 'border-ink bg-surface shadow-[inset_0_0_0_1px_var(--ink)]' : 'border-line bg-surface-2/60 hover:border-line-2 hover:bg-surface-2',
+              )}
+            >
+              <span aria-hidden="true" className="flex h-[5px] w-full gap-px overflow-hidden rounded-full">
+                {warnaPratinjau(konteks[j]!).map((c) => (
+                  <span key={c} className="flex-1" style={{ background: c }} />
+                ))}
+              </span>
+              <span className="max-w-full truncate text-[12.5px] font-bold leading-tight text-ink">{LABEL_SINGKAT[j]}</span>
+              <span className="max-w-full truncate text-[10.5px] leading-none text-ink-3">{GOLONGAN[j]}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 /** Kelas lapis konteks dengan laju median per kelas: bahan analisis langsung di legenda. */
 function LegendaKonteks({ lapis }: { lapis: LapisKonteks }) {
   const kelas = lapis.meta.statistik.length ? lapis.meta.statistik : lapis.fitur.map((f) => ({ nama: f.nama, warna: f.warna, median: undefined }))
+  const skala = Math.max(1, ...kelas.map((s) => s.median ?? 0))
   return (
-    <div className="mt-2.5">
-      <div className="flex items-baseline justify-between text-[11px] text-ink-3">
-        <span>Kelas</span>
-        <span>Median laju</span>
+    <div className="mt-2.5 rounded-[14px] bg-surface-2 p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[13px] font-bold text-ink">{LABEL_LAPIS[lapis.meta.lapis]}</span>
+        <span className="shrink-0 text-[10.5px] text-ink-3">median laju turun</span>
       </div>
-      <ul className="scroll-thin mt-1 max-h-[168px] space-y-1 overflow-y-auto pr-1 text-[12px] text-ink">
-        {kelas.map((s) => (
-          <li key={s.nama} className="flex items-center gap-2">
-            <span aria-hidden="true" className="size-3 shrink-0 rounded-[4px] ring-1 ring-black/10" style={{ background: s.warna }} />
-            <span className="min-w-0 flex-1 truncate" title={s.nama}>
-              {s.nama.replace(/^Kawasan (Peruntukan )?/, '')}
-            </span>
-            <span className="tnum shrink-0 text-ink-2">{s.median != null ? `${fmt(Math.max(0, s.median), 1)} cm` : '-'}</span>
-          </li>
-        ))}
+      <ul className="scroll-thin mt-2 max-h-[232px] space-y-2 overflow-y-auto pr-1">
+        {kelas.map((s) => {
+          const m = s.median != null ? Math.max(0, s.median) : null
+          return (
+            <li key={s.nama} className="grid grid-cols-[12px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1">
+              <span aria-hidden="true" className="size-3 rounded-[4px] ring-1 ring-black/10" style={{ background: s.warna }} />
+              <span className="truncate text-[12px] text-ink" title={s.nama}>
+                {s.nama.replace(/^Kawasan (Peruntukan )?/, '')}
+              </span>
+              <span className="tnum text-[11.5px] font-semibold text-ink-2">{m != null ? `${fmt(m, 1)} cm` : '-'}</span>
+              <span aria-hidden="true" className="col-span-2 col-start-2 h-1 overflow-hidden rounded-full bg-line">
+                {m != null && <span className="block h-full rounded-full bg-data" style={{ width: `${Math.max(3, (m / skala) * 100)}%` }} />}
+              </span>
+            </li>
+          )
+        })}
       </ul>
-      <p className="mt-2 text-[11px] leading-snug text-ink-3">
+      <p className="mt-2.5 text-[11px] leading-snug text-ink-3">
         {lapis.meta.jenis === 'perkiraan' ? 'Perkiraan dari bentuk lahan, bukan peta geologi resmi.' : `${lapis.meta.judul}${lapis.meta.skala ? `, ${lapis.meta.skala}` : ''}.`}
       </p>
       <button
@@ -58,7 +117,6 @@ function IsiLegenda() {
   const ukuranSel = useApp((s) => s.grid?.kepala.ukuranSelM ?? null)
   const konteks = useApp((s) => s.konteks)
   const lapisKonteks = useApp((s) => s.lapisKonteks)
-  const setLapisKonteks = useApp((s) => s.setLapisKonteks)
   const lapisAktif = lapisKonteks ? konteks[lapisKonteks] : undefined
   const adaKonteks = JENIS_LAPIS.some((j) => konteks[j])
 
@@ -118,21 +176,10 @@ function IsiLegenda() {
       {modePeta === 'kategori' && <p className="mt-2 text-[11.5px] leading-snug text-ink-3">Ambang dalam cm/tahun, masih asumsi awal.</p>}
       {ukuranSel != null && !lapisAktif && <p className="mt-2 text-[11.5px] leading-snug text-ink-3">Satu kotak di peta = satu piksel, sekitar {fmt(ukuranSel)} m.</p>}
       {adaKonteks && (
-        <div className="mt-3 border-t border-line pt-3">
-          <div className="mb-2 text-[12px] font-semibold text-ink-2">Lapis konteks</div>
-          <Segmented<PilihanLapis>
-            label="Lapis konteks"
-            ukuran="sm"
-            penuh
-            nilai={lapisKonteks ?? 'tidak'}
-            onUbah={(v) => setLapisKonteks(v === 'tidak' ? null : v)}
-            opsi={[
-              { nilai: 'tidak', label: 'Tidak' },
-              ...JENIS_LAPIS.filter((j) => konteks[j]).map((j) => ({ nilai: j, label: LABEL_SINGKAT[j] })),
-            ]}
-          />
+        <>
+          <PilihLapis />
           {lapisAktif && <LegendaKonteks lapis={lapisAktif} />}
-        </div>
+        </>
       )}
     </>
   )
@@ -316,7 +363,7 @@ export default function MapChrome() {
     return (
       <>
         <div className="glass absolute right-3 top-[calc(136px+var(--geser-atas))] z-10 flex flex-col rounded-[16px] p-1">
-          <IconButton label="Legenda dan lapis peta" aktif={legendaBuka} onClick={() => setLegendaBuka(true)}>
+          <IconButton label="Legenda dan lapis peta" data-tur="legenda" aktif={legendaBuka} onClick={() => setLegendaBuka(true)}>
             <Stack size={18} />
           </IconButton>
           <TombolTigaD />
@@ -353,7 +400,7 @@ export default function MapChrome() {
         </IconButton>
       </div>
 
-      <Panel aria-label="Legenda peta" className="scroll-thin absolute bottom-11 right-4 z-10 max-h-[calc(100dvh-140px)] w-[236px] overflow-y-auto p-3.5">
+      <Panel aria-label="Legenda peta" data-tur="legenda" className="scroll-thin absolute bottom-11 right-4 z-10 max-h-[calc(100dvh-140px)] w-[336px] overflow-y-auto p-4">
         <IsiLegenda />
       </Panel>
     </>

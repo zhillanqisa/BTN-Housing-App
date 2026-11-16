@@ -41,12 +41,12 @@ export default function Sorotan() {
   if (!kartu.length) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(78px+env(safe-area-inset-bottom))] z-10 pb-2 lg:bottom-0 lg:left-[424px] lg:right-[268px] lg:pb-4">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(78px+env(safe-area-inset-bottom))] z-10 pb-2 lg:bottom-0 lg:left-[424px] lg:right-[368px] lg:pb-4">
       <p className="pointer-events-auto mx-3 mb-2 inline-block rounded-full bg-[var(--glass)] px-3 py-1 text-[12px] font-semibold text-ink-2 backdrop-blur lg:mx-0">
         <span className="lg:hidden">Ketuk peta, atau coba lokasi contoh</span>
         <span className="hidden lg:inline">Coba lokasi contoh</span>
       </p>
-      <ul className="scroll-thin hp-tanpa-gulir pointer-events-auto flex snap-x gap-2.5 overflow-x-auto px-3 pb-1 lg:px-0" aria-label="Lokasi contoh">
+      <ul data-tur="contoh" className="scroll-thin hp-tanpa-gulir pointer-events-auto flex snap-x gap-2.5 overflow-x-auto px-3 pb-1 lg:px-0" aria-label="Lokasi contoh">
         {kartu.map(({ t, k, kelurahan }) => {
           const kat = klasifikasi(k.laju, k.memadai, thresholds)
           return (

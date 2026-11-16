@@ -1,6 +1,7 @@
 // Wilayah yang dicakup SubTen. Tiap wilayah punya berkas data sendiri di public/data:
-//   <id>-kawasan.geojson, <id>-grid.json (+ .bin), <id>-konteks-{rdtr,rtrw,geologi}.geojson
-// Ditulis oleh pipeline/06_ekspor.py dan pipeline/07_konteks.py dengan PA_WILAYAH=<id>.
+//   <id>-kawasan.geojson, <id>-grid.json (+ .bin), <id>-konteks-{rdtr,rtrw,geologi,banjir,abrasi}.geojson
+// Ditulis oleh pipeline/06_ekspor.py, 07_konteks.py, dan 07c_bahaya.py dengan PA_WILAYAH=<id>.
+import { kunciRute, type Rute } from './router'
 import type { BBox, Position } from './types'
 
 export type IdWilayah = 'semarang' | 'jakarta' | 'pekalongan' | 'demak'
@@ -148,6 +149,16 @@ export function wilayahById(id: string | null | undefined): Wilayah | null {
 
 export const adalahIdWilayah = (s: string | null | undefined): s is IdWilayah => !!s && PETA.has(s as IdWilayah)
 
+/** Wilayah yang diminta parameter w di tautan, bila tautan itu belum dibaca (kunciRute berbeda dari
+ *  `terbaca`) dan menunjuk wilayah selain `sekarang`. Tautan yang sudah dibaca tidak dipakai lagi:
+ *  sesudah pengguna memilih wilayah lain, w di tautan masih milik wilayah lama sampai data baru
+ *  selesai dimuat, dan membacanya ulang akan menarik aplikasi kembali ke wilayah lama. */
+export function wilayahDariTautan(rute: Rute, terbaca: string | null, sekarang: IdWilayah): IdWilayah | null {
+  if (kunciRute(rute) === terbaca) return null
+  const w = rute.params.get('w')
+  return adalahIdWilayah(w) && w !== sekarang ? w : null
+}
+
 /** Wilayah yang kotaknya memuat titik (dengan kelonggaran sekitar 1 km). */
 export function wilayahDiTitik(p: Position): Wilayah | null {
   const e = 0.01
@@ -167,6 +178,8 @@ export function urlWilayah(id: IdWilayah) {
       rdtr: `${dasar()}${id}-konteks-rdtr.geojson`,
       rtrw: `${dasar()}${id}-konteks-rtrw.geojson`,
       geologi: `${dasar()}${id}-konteks-geologi.geojson`,
+      banjir: `${dasar()}${id}-konteks-banjir.geojson`,
+      abrasi: `${dasar()}${id}-konteks-abrasi.geojson`,
     },
   }
 }

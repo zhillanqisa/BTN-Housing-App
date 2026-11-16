@@ -6,7 +6,7 @@
 
 Laporan mengikuti titik yang dipilih: angkanya dihitung dari blok piksel sekitar 240 m di sekitar titik itu, bukan rata-rata satu kelurahan. Dua titik dalam kelurahan yang sama bisa memberi hasil berbeda. Saat titik dipilih, batas kelurahannya disorot di peta.
 
-Tiga lapis konteks bisa ditumpangkan di peta dan muncul di laporan: zona RDTR (rencana zona per blok, dasar KKPR), pola ruang RTRW, dan geologi permukaan, masing-masing dengan laju median per zona atau satuan sebagai bahan analisis.
+Lapis konteks bisa ditumpangkan di peta dan muncul di laporan: zona RDTR (rencana zona per blok, dasar KKPR), pola ruang RTRW, geologi permukaan, serta bahaya banjir dan bahaya gelombang ekstrem dan abrasi dari InaRISK BNPB, masing-masing dengan laju median per kelas sebagai bahan analisis.
 
 **Demo:** https://zhillanqisa.github.io/BTN-Housing-App/
 
@@ -45,7 +45,7 @@ Hasil `dist/` berupa file statis dan bisa di-host gratis (GitHub Pages, Netlify,
 ## Alur demo yang disarankan
 
 1. Di halaman **Cek lokasi**, pilih wilayah di bilah atas, lalu klik kartu contoh (mis. "Tanah Mas" di Semarang, "Muara Angke" di Jakarta) atau cari alamat, atau klik titik mana pun di peta. Kotak hijau di peta menandai blok piksel yang dipakai untuk laporan, dan garis bercahaya menandai batas kelurahannya.
-   Di legenda, pilih **Lapis konteks** RDTR, RTRW, atau Geologi untuk menumpangkan zona tata ruang atau satuan geologi. Bagian **Konteks lokasi** di laporan menyebut sub-zona (mis. Perumahan Kepadatan Tinggi), zonanya, dan satuan geologi di titik itu.
+   Di legenda, pilih **Lapis konteks** RDTR, RTRW, Geologi, Banjir, atau Abrasi untuk menumpangkan zona tata ruang, satuan geologi, atau kelas bahaya. Bagian **Konteks lokasi** di laporan menyebut sub-zona (mis. Perumahan Kepadatan Tinggi), zonanya, satuan geologi, dan tingkat bahaya banjir atau abrasi di titik itu.
 2. Baca **Laporan Ambles**: status di titik itu, grafik riwayat, lalu Proyeksi Tenor. Coba klik titik lain di kelurahan yang sama dan bandingkan angkanya.
 3. Ganti tenor 10, 15, 20 tahun dan lihat rumah pada gambar ikut turun.
 4. Tekan **Unduh PDF** untuk laporan satu halaman.
@@ -154,7 +154,7 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 
 ### Lapis konteks (peta dan laporan)
 
-`<wilayah>-konteks-rdtr.geojson`, `<wilayah>-konteks-rtrw.geojson`, dan `<wilayah>-konteks-geologi.geojson`, ditulis oleh `pipeline/07_konteks.py`. Satu fitur = satu kelas (sub-zona untuk RDTR dan RTRW Kota, satuan untuk geologi).
+`<wilayah>-konteks-rdtr.geojson`, `<wilayah>-konteks-rtrw.geojson`, dan `<wilayah>-konteks-geologi.geojson`, ditulis oleh `pipeline/07_konteks.py`, serta `<wilayah>-konteks-banjir.geojson` dan `<wilayah>-konteks-abrasi.geojson`, ditulis oleh `pipeline/07c_bahaya.py`. Satu fitur = satu kelas (sub-zona untuk RDTR dan RTRW Kota, satuan untuk geologi, kelas rendah, sedang, atau tinggi untuk bahaya).
 
 - Properti fitur: `kode`, `nama`, `warna` (hex). RDTR dan RTRW menambah `zona` (kelompok zona, mis. Perumahan untuk sub-zona Perumahan Kepadatan Tinggi) dan `fungsi` (Lindung atau Budi daya). Geologi menambah `batuan` dan `sifat`. Statistik RDTR dan RTRW dihitung per zona.
 - `metadata`: `judul`, `jenis` (`resmi` atau `perkiraan`), `skala`, `sumber`, `catatan`, `aturan` (cara digitasi atau perkiraan), dan `statistik`: per kelas `kode`, `nama`, `luasKm2`, `nPiksel`, `cakupan`, `median`, `p75`, `porsiTinggi` (bagian piksel yang turun minimal 4 cm/tahun).
@@ -170,6 +170,7 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 | Persil (bidang tanah) | BHUMI ATR/BPN (bhumi.atrbpn.go.id/peta), ditautkan dari laporan bersama koordinat titik | BHUMI tidak menyediakan layanan peta terbuka untuk aplikasi lain dan dilindungi firewall serta reCAPTCHA, jadi batas persil tidak ditampilkan langsung (dicek 15 November 2026) |
 | Zona RDTR (Jakarta) | RDTR DKI Jakarta 2022 (Pergub Nomor 31 Tahun 2022), layanan peta publik DPMPTSP DKI | Rinci sampai blok. Badan Jalan tidak ditampilkan; celah jalan antarblok ditutup supaya peta ringan |
 | Geologi (Semarang) | Peta Geologi Lembar Magelang dan Semarang 1:100.000 (Thanden dkk. 1996), didigitasi dengan `pipeline/07a_digitasi_geologi.py` | 7 satuan. Batas Aluvium cocok 87% dengan kaki bukit pada DEM tanpa digeser |
+| Bahaya banjir, gelombang ekstrem, dan abrasi (semua wilayah) | InaRISK BNPB, ArcGIS ImageServer `INDEKS_BAHAYA_BANJIR` dan `layer_bahaya_gelombang_ekstrim_dan_abrasi` di gis.bnpb.go.id, diambil dengan `pipeline/07c_bahaya.py` | Grid asli 100 m tanpa resampling, dibagi ke kelas BNPB (rendah sampai 0,333, sedang sampai 0,666, tinggi). Lisensi pemakaian ulang tidak dicantumkan; ditampilkan dengan atribusi. Demak menyusul setelah grid lajunya jadi |
 | Geologi (Jakarta, Pekalongan, Demak) | Lembar Jakarta dan Kepulauan Seribu (Turkandi dkk. 1992), Banjarnegara dan Pekalongan (Condon dkk. 1996), Kudus (Suwarti dan Wikarno 1992), dan Salatiga (Sukardi dan Budhitrisna 1992); didigitasi dengan `pipeline/07b_geologi_lembar.py` | Warna satuan diambil dari kotak legenda lembar itu sendiri. Ketelitian batas sekitar 100 sampai 200 m |
 
 Hasil analisis: median laju di Aluvium 3,6 cm/tahun dan 48% pikselnya turun minimal 4 cm/tahun. Di keenam satuan batuan lain (Formasi Damar, Kaligetas, Kerek, Kalibeng, Jongkong, dan batuan gunungapi Gajahmungkur) median sekitar 0 dan tidak ada piksel yang turun secepat itu. Di dalam Aluvium pun ambles cepat terpusat di bagian utara dan timur; Aluvium di barat relatif stabil.
@@ -218,7 +219,7 @@ Acuan: spreadsheet tim "Sumber & Alur Olah Data" dan draf ide. Hal di luar kedua
 - 18% piksel kota tidak terukur, terutama tambak dan pesisir Tugu serta lereng bervegetasi di Mijen dan Gunungpati. Di sana aplikasi menulis "data tidak memadai".
 - RDTR terbuka baru ada untuk Jakarta, Kota Pekalongan, dan Kawasan Mranggen (Demak). Semarang memakai RTRW Kota 1:25.000 dan Demak di luar Mranggen memakai RTRW Provinsi 1:250.000, keduanya belum cukup untuk memastikan peruntukan satu persil. Kepastian tetap di KKPR. GISTARU ATR/BPN menyimpan RDTR nasional di balik token.
 - Lapis geologi berskala 1:100.000 dan menggambarkan batuan di permukaan, bukan tebal endapan lunak di bawah satu persil. Peta Geologi Kuarter Lembar Semarang 1:50.000 yang lebih rinci untuk endapan muda belum didigitasi.
-- Lapis rob tidak dipakai: InaRISK BNPB tidak mencantumkan lisensi pemakaian ulang dan tidak punya lapis rob khusus. Elevasi dari DEM global juga tidak ditampilkan karena galatnya beberapa meter.
+- Lapis bahaya banjir dan abrasi diambil dari InaRISK BNPB, yang tidak mencantumkan lisensi pemakaian ulang. Lapis ini ditampilkan dengan atribusi sebagai konteks; bila dipakai di luar kompetisi, minta izin tertulis ke BNPB. Indeks bahaya adalah model nasional 100 m, bukan catatan kejadian, dan tidak memperhitungkan penurunan tanah. Lapis genangan rob khusus belum ada. Elevasi dari DEM global tidak ditampilkan karena galatnya beberapa meter.
 - Data berhenti di November 2026. Pembaruan berarti menjalankan ulang pipeline; belum otomatis.
 - Nominatim: maksimal 1 permintaan per detik dan tanpa autocomplete. Karena itu pencarian alamat hanya dikirim saat tombol Cari ditekan. Untuk pemakaian ramai, siapkan layanan geocoding sendiri.
 - Paket pengembangan `osmtogeojson` membawa dependensi lama (`@xmldom/xmldom`) yang ditandai `npm audit`. Hanya dipakai skrip pengambil batas, tidak ikut ke aplikasi.

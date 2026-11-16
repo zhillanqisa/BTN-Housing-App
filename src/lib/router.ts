@@ -3,7 +3,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import type { Halaman } from './types'
 
-const HALAMAN: Halaman[] = ['peta', 'bandingkan', 'dashboard', 'metode']
+const HALAMAN: Halaman[] = ['peta', 'bandingkan', 'dashboard', 'metode', 'tentang']
 
 export interface Rute {
   halaman: Halaman
@@ -15,6 +15,11 @@ export function bacaRute(hash: string): Rute {
   const [jalur = '', query = ''] = bersih.split('?')
   const halaman = (HALAMAN as string[]).includes(jalur) ? (jalur as Halaman) : 'peta'
   return { halaman, params: new URLSearchParams(query) }
+}
+
+/** Kunci isi rute (halaman + parameter), untuk mengenali tautan yang sudah dibaca. */
+export function kunciRute(r: Rute): string {
+  return `${r.halaman}?${r.params.toString()}`
 }
 
 type NilaiParam = string | number | null | undefined
