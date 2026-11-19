@@ -327,10 +327,10 @@
 /* Ponsel: deret kartu contoh digeser dengan jari, tanpa bilah gulir. Atribusi peta pindah ke bawah
    kolom tombol kanan supaya tidak tertutup navigasi bawah dan lembar laporan. */
 /* Jarak tambahan dari tepi atas layar ponsel, supaya bilah atas tidak menabrak lubang kamera atau poni.
-   Halaman memakai viewport-fit=cover; bila perangkat melaporkan area aman, itu yang dipakai.
-   - Tab peramban: bilah status berada di luar halaman, jadi cukup jarak tipis.
-   - Aplikasi terpasang atau layar penuh: halaman memenuhi layar sampai tepi atas, jadi minimal 28px
-     untuk ponsel yang tidak melaporkan area amannya.
+   Halaman memakai viewport-fit=cover. Saat halaman digambar sampai area kamera (layar penuh imersif,
+   lihat layarPenuhOtomatis), peramban melaporkan tinggi area itu lewat env(safe-area-inset-top) dan
+   bilah atas turun tepat di bawahnya; peta tetap memenuhi layar sampai tepi atas. Di tab peramban dan
+   saat area kamera berupa pita hitam, nilainya 0 dan cukup jarak tipis 8px.
    Semua elemen yang diposisikan dari atas ikut bergeser. */
 :root {
   --geser-atas: 0px;
@@ -338,16 +338,6 @@
 @media (max-width: 1023.98px) {
   :root {
     --geser-atas: max(env(safe-area-inset-top), 8px);
-  }
-  :root:fullscreen {
-    --geser-atas: max(env(safe-area-inset-top), 28px);
-  }
-}
-/* Hanya mode layar penuh: halaman memenuhi layar sampai tepi atas. Di mode standalone bilah status
-   berada di luar halaman, jadi jarak tipis seperti di tab peramban sudah cukup. */
-@media (max-width: 1023.98px) and (display-mode: fullscreen) {
-  :root {
-    --geser-atas: max(env(safe-area-inset-top), 28px);
   }
 }
 

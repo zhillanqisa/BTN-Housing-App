@@ -92,6 +92,26 @@ export async function alihLayarPenuh(): Promise<void> {
   }
 }
 
+/** Aplikasi terpasang di Android (display: fullscreen) menyisakan pita hitam di area kamera: Chrome
+ *  tidak menggambar halaman ke sana. Dalam Fullscreen API dengan viewport-fit=cover, Chrome menggambar
+ *  sampai ke area kamera dan melaporkan tingginya lewat env(safe-area-inset-top). Fullscreen API hanya
+ *  boleh dipanggil dari sentuhan pengguna, jadi sentuhan pertama di aplikasi terpasang memasukinya.
+ *  Bila pengguna keluar (gestur kembali), sentuhan berikutnya memasukinya lagi. Di tab peramban dan
+ *  di iPhone (Fullscreen API tidak tersedia) fungsi ini tidak melakukan apa-apa. */
+export function layarPenuhOtomatis(): void {
+  if (typeof window === 'undefined' || !document.fullscreenEnabled) return
+  if (!window.matchMedia('(display-mode: fullscreen)').matches && !window.matchMedia('(display-mode: standalone)').matches) return
+  const masuk = () => {
+    if (document.fullscreenElement) return
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
+      /* ditolak peramban: tetap jalan dengan pita di area kamera */
+    })
+  }
+  // click dan touchend sama-sama dihitung sebagai sentuhan pengguna oleh peramban
+  window.addEventListener('click', masuk, { capture: true, passive: true })
+  window.addEventListener('touchend', masuk, { capture: true, passive: true })
+}
+
 // ---------------------------------------------------------------- ajakan sekali tampil
 
 const KUNCI_TUTUP = 'subten.pasang.tutup'
