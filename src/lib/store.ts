@@ -204,6 +204,9 @@ export const useApp = create<AppState>()((set, get) => ({
   setTema: (tema) => {
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-theme', tema)
+      // warna bilah status di aplikasi terpasang mengikuti tema aplikasi, bukan tema sistem ponsel
+      // (selama layar pembuka masih tampil, warnanya tetap navy)
+      if (!document.getElementById('pembuka')) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', tema === 'dark' ? '#0b1220' : '#f1f4f8')
       try {
         localStorage.setItem('pa-tema', tema)
       } catch {

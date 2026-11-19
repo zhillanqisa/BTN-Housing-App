@@ -168,6 +168,11 @@ export default function App() {
     void useApp.getState().muatDemo()
   }, [])
 
+  // layar pembuka (index.html) ditutup begitu data pertama selesai dimuat, berhasil atau gagal
+  useEffect(() => {
+    if (status !== 'memuat') (window as Window & { __tutupPembuka?: () => void }).__tutupPembuka?.()
+  }, [status])
+
   // tautan -> state
   useEffect(() => {
     if (status !== 'siap' || halaman !== 'peta') return

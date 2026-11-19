@@ -343,7 +343,9 @@
     --geser-atas: max(env(safe-area-inset-top), 28px);
   }
 }
-@media (max-width: 1023.98px) and (display-mode: fullscreen), (max-width: 1023.98px) and (display-mode: standalone) {
+/* Hanya mode layar penuh: halaman memenuhi layar sampai tepi atas. Di mode standalone bilah status
+   berada di luar halaman, jadi jarak tipis seperti di tab peramban sudah cukup. */
+@media (max-width: 1023.98px) and (display-mode: fullscreen) {
   :root {
     --geser-atas: max(env(safe-area-inset-top), 28px);
   }
