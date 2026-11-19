@@ -1,0 +1,139 @@
+{
+ "dibuat": "2026-11-15",
+ "ambangCm": [
+  2,
+  4
+ ],
+ "wilayah": [
+  {
+   "id": "semarang",
+   "status": "olahan",
+   "nama": "Kota Semarang",
+   "periode": [
+    "2020-01",
+    "2026-11"
+   ],
+   "lulusGerbang": true,
+   "nKelurahan": 177,
+   "nKelurahanMemadai": 177,
+   "nKelurahanTinggi": 48,
+   "tercepat": [
+    {
+     "nama": "Penggaron Lor",
+     "kecamatan": "Genuk",
+     "laju": 11.6
+    },
+    {
+     "nama": "Penggaron Kidul",
+     "kecamatan": "Pedurungan",
+     "laju": 10.4
+    },
+    {
+     "nama": "Kudu",
+     "kecamatan": "Genuk",
+     "laju": 10.2
+    }
+   ],
+   "piksel": {
+    "dalamWilayah": 61060,
+    "terukur": 49830,
+    "persenTerukur": 82,
+    "median": 0,
+    "p95": 8.8,
+    "maks": 12.7,
+    "luasKm2": {
+     "min2": 73.2,
+     "min4": 60.4
+    }
+   }
+  },
+  {
+   "id": "jakarta",
+   "status": "olahan",
+   "nama": "DKI Jakarta",
+   "periode": [
+    "2020-01",
+    "2026-11"
+   ],
+   "lulusGerbang": true,
+   "nKelurahan": 262,
+   "nKelurahanMemadai": 262,
+   "nKelurahanTinggi": 0,
+   "tercepat": [
+    {
+     "nama": "Kamal Muara",
+     "kecamatan": "Penjaringan",
+     "laju": 1.9
+    },
+    {
+     "nama": "Pluit",
+     "kecamatan": "Penjaringan",
+     "laju": 1.9
+    },
+    {
+     "nama": "Kamal",
+     "kecamatan": "Kalideres",
+     "laju": 1.7
+    }
+   ],
+   "piksel": {
+    "dalamWilayah": 101479,
+    "terukur": 96459,
+    "persenTerukur": 95,
+    "median": 0.47,
+    "p95": 1.6,
+    "maks": 7.9,
+    "luasKm2": {
+     "min2": 12.9,
+     "min4": 1.2
+    }
+   }
+  },
+  {
+   "id": "pekalongan",
+   "status": "olahan",
+   "nama": "Kota Pekalongan",
+   "periode": [
+    "2020-01",
+    "2026-11"
+   ],
+   "lulusGerbang": true,
+   "nKelurahan": 27,
+   "nKelurahanMemadai": 27,
+   "nKelurahanTinggi": 26,
+   "tercepat": [
+    {
+     "nama": "Pasirkratonkramat",
+     "kecamatan": "Pekalongan Barat",
+     "laju": 9.7
+    },
+    {
+     "nama": "Tirto",
+     "kecamatan": "Pekalongan Barat",
+     "laju": 9.2
+    },
+    {
+     "nama": "Banyurip",
+     "kecamatan": "Pekalongan Selatan",
+     "laju": 9
+    }
+   ],
+   "piksel": {
+    "dalamWilayah": 7212,
+    "terukur": 6067,
+    "persenTerukur": 84,
+    "median": 6.9,
+    "p95": 9.6,
+    "maks": 11,
+    "luasKm2": {
+     "min2": 38.6,
+     "min4": 35.4
+    }
+   }
+  },
+  {
+   "id": "demak",
+   "status": "belum"
+  }
+ ]
+}
