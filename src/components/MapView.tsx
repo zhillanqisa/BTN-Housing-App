@@ -492,6 +492,14 @@ export default function MapView({ aktif }: { aktif: boolean }) {
       canvasContextAttributes: { preserveDrawingBuffer: true },
     })
     peta.current = map
+    // Di ponsel atribusi ringkas dimulai tertutup (tombol i) supaya tidak menutupi peta; isinya tetap
+    // bisa dibuka kapan saja. MapLibre membukanya di awal dan baru menutup setelah peta digeser.
+    map.once('load', () => {
+      if (!layarKecil()) return
+      const atribusi = wadah.current?.querySelector('.maplibregl-ctrl-attrib')
+      atribusi?.classList.remove('maplibregl-compact-show')
+      atribusi?.removeAttribute('open')
+    })
     // kait debug, hanya saat pengembangan
     if (import.meta.env.DEV) (window as unknown as { __peta?: PetaGL }).__peta = map
 

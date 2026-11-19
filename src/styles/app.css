@@ -327,14 +327,25 @@
 /* Ponsel: deret kartu contoh digeser dengan jari, tanpa bilah gulir. Atribusi peta pindah ke bawah
    kolom tombol kanan supaya tidak tertutup navigasi bawah dan lembar laporan. */
 /* Jarak tambahan dari tepi atas layar ponsel, supaya bilah atas tidak menabrak lubang kamera atau poni.
-   Halaman memakai viewport-fit=cover; bila perangkat melaporkan area aman, itu yang dipakai. Minimal 22px
-   untuk ponsel (dan mockup) yang tidak melaporkannya. Semua elemen yang diposisikan dari atas ikut bergeser. */
+   Halaman memakai viewport-fit=cover; bila perangkat melaporkan area aman, itu yang dipakai.
+   - Tab peramban: bilah status berada di luar halaman, jadi cukup jarak tipis.
+   - Aplikasi terpasang atau layar penuh: halaman memenuhi layar sampai tepi atas, jadi minimal 28px
+     untuk ponsel yang tidak melaporkan area amannya.
+   Semua elemen yang diposisikan dari atas ikut bergeser. */
 :root {
   --geser-atas: 0px;
 }
 @media (max-width: 1023.98px) {
   :root {
-    --geser-atas: max(calc(env(safe-area-inset-top) - 6px), 22px);
+    --geser-atas: max(env(safe-area-inset-top), 8px);
+  }
+  :root:fullscreen {
+    --geser-atas: max(env(safe-area-inset-top), 28px);
+  }
+}
+@media (max-width: 1023.98px) and (display-mode: fullscreen), (max-width: 1023.98px) and (display-mode: standalone) {
+  :root {
+    --geser-atas: max(env(safe-area-inset-top), 28px);
   }
 }
 

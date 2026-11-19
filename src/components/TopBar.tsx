@@ -7,6 +7,7 @@ import { useApp } from '../lib/store'
 import { mulaiTur } from '../lib/tur'
 import type { Halaman } from '../lib/types'
 import { cx, IconButton, Logo, Wordmark } from '../ui/primitives'
+import { TombolPasang } from './PasangAplikasi'
 import PilihWilayah from './PilihWilayah'
 
 /** Halaman aplikasi. singkat = label di navigasi bawah ponsel (NavBawah). */
@@ -75,6 +76,9 @@ export default function TopBar({ halaman }: { halaman: Halaman }) {
             Data demo
           </button>
         )}
+        <span className="hidden lg:contents">
+          <TombolPasang />
+        </span>
         <IconButton label="Tur aplikasi" title="Tur aplikasi" onClick={mulaiTur}>
           <Question size={18} />
         </IconButton>

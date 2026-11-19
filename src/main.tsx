@@ -12,3 +12,13 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// Service worker (public/sw.js): syarat aplikasi bisa dipasang, dan tetap terbuka tanpa sinyal.
+// Hanya di build produksi supaya server pengembangan tidak tersimpan di cache.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      /* tanpa service worker aplikasi tetap jalan, hanya tidak bisa luring */
+    })
+  })
+}

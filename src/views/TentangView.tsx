@@ -26,6 +26,7 @@ import {
 import { navigasi } from '../lib/router'
 import { ATRIBUSI, KONTAK, MITRA, PEMBIMBING, REPO, SINERGI_BTN, TIM, type Anggota } from '../lib/tentang'
 import { mulaiTur } from '../lib/tur'
+import { TombolPasang } from '../components/PasangAplikasi'
 import { Button, Card, cx, Logo, Wordmark } from '../ui/primitives'
 
 const IKON_MITRA = [House, Buildings, UserCircleGear, Bank]
@@ -143,6 +144,7 @@ export default function TentangView() {
             <Button onClick={() => navigasi('peta')} ikon={<ArrowRight size={17} />}>
               Cek lokasi
             </Button>
+            <TombolPasang bentuk="tombol" />
             <Button varian="ghost" onClick={mulaiTur} ikon={<Compass size={17} />}>
               Tur aplikasi
             </Button>

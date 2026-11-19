@@ -12,6 +12,7 @@ import SearchBox from './components/SearchBox'
 import Sorotan from './components/Sorotan'
 import TopBar from './components/TopBar'
 import TurAplikasi from './components/TurAplikasi'
+import { AjakanPasang } from './components/PasangAplikasi'
 import { DEFAULT_TENOR, TENORS } from './lib/config'
 import { useLayarKecil } from './lib/layar'
 import { kunciTitik, LABEL_TITIK } from './lib/lokasi'
@@ -261,6 +262,7 @@ export default function App() {
       )}
       <TopBar halaman={halaman} />
       <NavBawah halaman={halaman} />
+      <AjakanPasang />
       <TurAplikasi />
     </div>
   )

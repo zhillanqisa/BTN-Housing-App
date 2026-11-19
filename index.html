@@ -7,8 +7,16 @@
       name="description"
       content="SubTen (Subsidence × Tenor): cek laju penurunan tanah di sekitar rumah incaran dan proyeksinya selama masa cicilan KPR. Wilayah: Semarang, Jakarta, Pekalongan, Demak."
     />
-    <meta name="theme-color" content="#f1f4f8" />
+    <meta name="theme-color" content="#f1f4f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!-- aplikasi terpasang (PWA): tampil penuh tanpa bilah peramban -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./ikon/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="SubTen" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>SubTen | Cek Tanah Sebelum KPR</title>
     <script>
       // Set tema sebelum render pertama supaya tidak berkedip.
