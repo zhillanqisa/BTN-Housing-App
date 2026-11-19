@@ -6,10 +6,6 @@ import '@fontsource-variable/geist-mono'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './styles/app.css'
 import App from './App'
-import { layarPenuhOtomatis } from './lib/pasang'
-
-// aplikasi terpasang di Android: penuh sampai area kamera sejak sentuhan pertama
-layarPenuhOtomatis()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

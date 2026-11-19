@@ -3,8 +3,7 @@
 // Ponsel: tombol ringkas (tanpa zoom, cukup cubit), legenda mini, legenda lengkap dalam lembar bawah,
 // dan tombol "Lokasi saya" untuk memeriksa tempat pengguna berdiri.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowRight, ArrowsIn, ArrowsOut, CircleNotch, CornersOut, Crosshair, Minus, Plus, Stack, X } from '@phosphor-icons/react'
-import { alihLayarPenuh, bisaLayarPenuh, useLayarPenuh } from '../lib/pasang'
+import { ArrowRight, CircleNotch, CornersOut, Crosshair, Minus, Plus, Stack, X } from '@phosphor-icons/react'
 import { LAJU_BINS, LABEL_KATEGORI } from '../lib/config'
 import { fmt } from '../lib/format'
 import { JENIS_LAPIS, LABEL_LAPIS, LABEL_SINGKAT, type JenisLapis, type LapisKonteks } from '../lib/konteks'
@@ -307,18 +306,6 @@ function LembarLegenda({ onTutup }: { onTutup: () => void }) {
   )
 }
 
-/** Layar penuh di tab peramban ponsel (Android): bilah alamat dan navigasi peramban hilang.
- *  Tidak tampil di iPhone (Fullscreen API tidak tersedia) dan di aplikasi yang sudah terpasang. */
-function TombolLayarPenuh() {
-  const penuh = useLayarPenuh()
-  if (!penuh && !bisaLayarPenuh()) return null
-  return (
-    <IconButton label={penuh ? 'Keluar dari layar penuh' : 'Layar penuh'} onClick={() => void alihLayarPenuh()}>
-      {penuh ? <ArrowsIn size={18} /> : <ArrowsOut size={18} />}
-    </IconButton>
-  )
-}
-
 /** Pilih titik di tempat pengguna berada (GPS ponsel). Pindah wilayah bila perlu. */
 function TombolLokasiSaya({ kabari }: { kabari: (t: string) => void }) {
   const [sibuk, setSibuk] = useState(false)
@@ -384,7 +371,6 @@ export default function MapChrome() {
             <CornersOut size={18} />
           </IconButton>
           <TombolLokasiSaya kabari={kabari} />
-          <TombolLayarPenuh />
         </div>
         <LegendaMini onBuka={() => setLegendaBuka(true)} />
         {legendaBuka && <LembarLegenda onTutup={() => setLegendaBuka(false)} />}

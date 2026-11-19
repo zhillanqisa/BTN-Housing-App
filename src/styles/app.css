@@ -327,10 +327,10 @@
 /* Ponsel: deret kartu contoh digeser dengan jari, tanpa bilah gulir. Atribusi peta pindah ke bawah
    kolom tombol kanan supaya tidak tertutup navigasi bawah dan lembar laporan. */
 /* Jarak tambahan dari tepi atas layar ponsel, supaya bilah atas tidak menabrak lubang kamera atau poni.
-   Halaman memakai viewport-fit=cover. Saat halaman digambar sampai area kamera (layar penuh imersif,
-   lihat layarPenuhOtomatis), peramban melaporkan tinggi area itu lewat env(safe-area-inset-top) dan
-   bilah atas turun tepat di bawahnya; peta tetap memenuhi layar sampai tepi atas. Di tab peramban dan
-   saat area kamera berupa pita hitam, nilainya 0 dan cukup jarak tipis 8px.
+   Halaman memakai viewport-fit=cover. Bila halaman digambar sampai area kamera (aplikasi terpasang di
+   iPhone dengan bilah status tembus pandang), peramban melaporkan tinggi area itu lewat
+   env(safe-area-inset-top) dan bilah atas turun tepat di bawahnya. Di tab peramban dan aplikasi
+   terpasang di Android, bilah status berada di luar halaman: nilainya 0 dan cukup jarak tipis 8px.
    Semua elemen yang diposisikan dari atas ikut bergeser. */
 :root {
   --geser-atas: 0px;
