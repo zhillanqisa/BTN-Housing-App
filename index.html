@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="SubTen (Subsidence × Tenor): cek laju penurunan tanah di sekitar rumah incaran dan proyeksinya selama masa cicilan KPR. Wilayah: Semarang, Jakarta, Pekalongan, Demak."
+    />
+    <!-- navy selama layar pembuka; sesudahnya mengikuti tema aplikasi (lihat __tutupPembuka dan setTema) -->
+    <meta name="theme-color" content="#0f1d33" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!-- aplikasi terpasang (PWA): tampil penuh tanpa bilah peramban -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./ikon/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="SubTen" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>SubTen | Cek Tanah Sebelum KPR</title>
+    <script>
+      // Set tema sebelum render pertama supaya tidak berkedip.
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem('pa-tema');
+        } catch (e) {}
+        if (t !== 'light' && t !== 'dark') {
+          t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      })();
+    </script>
+    <style>#pembuka{z-index:100;background:#0f1d33;justify-content:center;align-items:center;transition:opacity .45s,visibility .45s;display:flex;position:fixed;inset:0}#pembuka.selesai{opacity:0;visibility:hidden}.pembuka-isi{flex-direction:column;align-items:center;animation:.7s cubic-bezier(.16,1,.3,1) both pembuka-muncul;display:flex}.pembuka-logo{width:92px;height:92px}.pembuka-nama{letter-spacing:-.025em;color:#eef3fb;margin-top:18px;font:800 36px/1 Plus Jakarta Sans Variable,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}.pembuka-nama span{color:#34b5a3}.pembuka-tag{letter-spacing:.22em;text-transform:uppercase;color:#eef3fb8c;margin-top:12px;font:600 11.5px/1 Plus Jakarta Sans Variable,ui-sans-serif,system-ui,sans-serif}.pembuka-muat{bottom:calc(72px + env(safe-area-inset-bottom));background:#eef3fb1f;border-radius:3px;width:112px;height:3px;position:absolute;overflow:hidden}.pembuka-muat span{background:#34b5a3;border-radius:3px;width:40%;height:100%;animation:1.15s cubic-bezier(.65,0,.35,1) infinite pembuka-jalan;display:block}@keyframes pembuka-muncul{0%{opacity:0;transform:translateY(10px)scale(.97)}to{opacity:1;transform:none}}@keyframes pembuka-jalan{0%{transform:translate(-110%)}to{transform:translate(280%)}}@media (prefers-reduced-motion:reduce){.pembuka-isi,.pembuka-muat span{animation:none}}</style>
+    <script type="module" crossorigin src="./assets/index-RszZBbqJ.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-WkwZ5CU-.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-BaznnrNz.css">
+  </head>
+  <body>
+    <div id="pembuka" aria-hidden="true">
+      <div class="pembuka-isi">
+        <svg class="pembuka-logo" viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 42V24.6L32 4.2l13 9.4" stroke="#eef3fb" stroke-width="4.6" />
+          <g fill="#eef3fb">
+            <rect x="21" y="23" width="5.6" height="5.6" rx="1.1" />
+            <rect x="28.6" y="23" width="5.6" height="5.6" rx="1.1" />
+            <rect x="21" y="30.6" width="5.6" height="5.6" rx="1.1" />
+            <rect x="28.6" y="30.6" width="5.6" height="5.6" rx="1.1" />
+          </g>
+          <path d="M6 47.5c8-3.3 15.5-3 22.5 1 3.2 1.8 5.5 1.6 8.3-.4 5.2-3.8 11.4-6.6 21.2-6.6" stroke="#34b5a3" stroke-width="4.4" />
+          <path d="M6 55.5c8-3.3 15.5-3 22.5 1 3.2 1.8 5.5 1.6 8.3-.4 5.2-3.8 11.4-6.6 21.2-6.6" stroke="#4fa871" stroke-width="4.4" />
+          <path d="M53 13.5a8.5 8.5 0 0 0-8.5 8.5c0 5.4 6.2 11.6 8.5 15.6 2.3-4 8.5-10.2 8.5-15.6a8.5 8.5 0 0 0-8.5-8.5Z" fill="#f0813f" />
+          <circle cx="53" cy="22" r="3" fill="#0f1d33" />
+        </svg>
+        <div class="pembuka-nama">Sub<span>Ten</span></div>
+        <div class="pembuka-tag">Cek tanah sebelum KPR</div>
+      </div>
+      <div class="pembuka-muat"><span></span></div>
+    </div>
+    <div id="root"></div>
+    <script>
+      // Tutup layar pembuka: dipanggil aplikasi saat data pertama siap. Minimal tampil 0,65 detik
+      // supaya tidak sekadar berkedip, dan tertutup sendiri setelah 10 detik bila aplikasi bermasalah.
+      window.__tutupPembuka = function () {
+        var el = document.getElementById('pembuka');
+        if (!el || el.getAttribute('data-tutup')) return;
+        el.setAttribute('data-tutup', '1');
+        setTimeout(function () {
+          el.classList.add('selesai');
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', document.documentElement.getAttribute('data-theme') === 'dark' ? '#0b1220' : '#f1f4f8');
+          setTimeout(function () {
+            el.remove();
+          }, 500);
+        }, Math.max(0, 650 - performance.now()));
+      };
+      setTimeout(window.__tutupPembuka, 10000);
+    </script>
+  </body>
+</html>

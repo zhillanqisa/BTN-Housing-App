@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "SubTen",
+  "short_name": "SubTen",
+  "description": "Cek laju penurunan tanah di titik rumah incaran dan dampaknya selama masa cicilan KPR, dari radar satelit Sentinel-1.",
+  "lang": "id",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1d33",
+  "theme_color": "#0f1d33",
+  "categories": ["finance", "navigation", "utilities"],
+  "icons": [
+    { "src": "ikon/ikon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "ikon/ikon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "ikon/ikon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
