@@ -59,6 +59,7 @@ Dihitung dari 512 interferogram ascending dan 574 dari 575 descending (satu pasa
 6. **Internet putus** membuat `status_hyp3.py` gagal dan putaran unduh mengira antrean kosong. Skrip putaran sekarang menganggap status yang gagal dibaca sebagai masih berjalan.
 7. **Baseline NaN di produk HyP3.** Satu produk descending Pekalongan (20240818_20240911) berisi `Baseline: nan`. Inversi baseline MintPy lalu gagal dengan "SVD did not converge in Linear Least Squares". `04_mintpy.py` sekarang membuang pasangan seperti itu lewat `mintpy.network.excludeDate12`.
 8. **Zip setengah jadi.** Unduhan yang terputus meninggalkan zip rusak yang terus dipakai di putaran berikutnya ("pita unw_phase tidak ada di zip"). `03_unduh_potong.py` kini menghapus zip yang gagal diunduh atau tidak terbaca.
+   Pilihan `--langsung` tidak mengunduh zip utuh: lewat HTTP Range hanya direktori zip dan pita yang dipakai (`unw_phase`, `corr`, `conncomp`, `.txt`) yang diambil, sekitar 17% isi zip; sisanya KMZ, amplitudo, dan fase terbungkus. Dipakai untuk Demak lewat hotspot: hasil potong sama persis dengan cara lama. Membaca zip lewat `/vsicurl` GDAL justru boros (2 sampai 3 kali ukuran zip) karena aliran deflate dibaca ulang dari awal tiap kali mundur.
 9. **RTRW Kota Pekalongan tidak tersedia terbuka.** Layanan pola ruang Provinsi Jawa Tengah yang terbuka hanya memuat Kendal, Semarang, Demak, dan Jepara. Layanan "RTRW_KOTA_PEKALONGAN" di ArcGIS Online milik akun pribadi tanpa sumber dan lisensi, jadi tidak dipakai. `07_konteks.py` melewati lapis pola ruang bila layanan provinsi tidak punya fitur di wilayah itu.
 10. **RDTR dari geoportal Palapa pemda.** Geoportal Kota Pekalongan, Kota Semarang, dan Kabupaten Demak memakai GeoServer dengan WFS terbuka. Pekalongan punya RDTR 2024-2044 (1:5.000), Semarang hanya pola ruang RTRW 1:25.000, Demak punya RDTR Mranggen (layanannya 503 saat dicek). Dua jebakan: respons utuh belasan MB terputus di tengah ("Response ended prematurely"), jadi diunduh per 1.000 fitur; dan keluaran derajat dibulatkan server ke 4 desimal (sekitar 11 m), jadi diminta dalam UTM lalu diproyeksikan ulang. Sertifikat Let's Encrypt baru di geoportal Demak belum dikenal paket certifi, jadi unduhan jatuh ke `curl.exe` Windows yang memakai penyimpanan sertifikat sistem. Sub-zona dikelompokkan ke zona Permen ATR/BPN 14/2021 (`ZONA_ATURAN`); warna dan statistik per zona, laporan menyebut sub-zonanya. GISTARU ATR/BPN tidak dipakai: daftar layanannya kosong tanpa token, dan aplikasinya mengambil data lewat proxy.
 
@@ -164,6 +165,7 @@ python pipeline/02_pesan_hyp3.py --lintasan desc --uji 5 --kirim
 python pipeline/02_pesan_hyp3.py --lintasan desc --kirim
 python pipeline/status_hyp3.py
 python pipeline/03_unduh_potong.py --lintasan desc
+python pipeline/03_unduh_potong.py --lintasan asc --pekerja 8 --langsung   # hemat kuota
 python pipeline/04_mintpy.py --lintasan desc
 python pipeline/04_mintpy.py --lintasan asc
 python pipeline/05_vertikal_validasi.py
