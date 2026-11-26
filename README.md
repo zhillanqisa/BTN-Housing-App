@@ -21,11 +21,11 @@ Pilih wilayah di bilah atas atau di kartu awal. Tautan menyimpan wilayahnya (`#/
 | Kota Semarang | 1.433 interferogram | 82% | 0,34 cm/tahun | CSEM (titik ikat) | Lembar Magelang dan Semarang | RTRW Kota Semarang 1:25.000 (Distaru); RDTR belum terbuka |
 | DKI Jakarta | 1.056 interferogram | 95% | 0,45 cm/tahun | CBTU (titik ikat); periode sama 2020-2021: CJKT selisih 0,36, CTGR selisih 0,87 cm/tahun | Lembar Jakarta dan Kepulauan Seribu | RDTR DKI 2022 |
 | Kota Pekalongan | 1.086 interferogram | 84% | 0,71 cm/tahun | CPKL (pembanding); periode sama 2020-2021: GNSS 10,00, InSAR 10,01 cm/tahun | Lembar Banjarnegara dan Pekalongan | RDTR Kota Pekalongan 2024-2044 (1:5.000) |
-| Kabupaten Demak | sedang diolah | | | CSEM (titik ikat) | Lembar Kudus dan Salatiga | RTRW Prov. Jateng 2024-2044; RDTR Mranggen bila geoportal Pemkab bisa diakses |
+| Kabupaten Demak | 1.398 interferogram | 25% | 0,76 cm/tahun | CSEM (titik ikat) | Lembar Kudus dan Salatiga | RTRW Prov. Jateng 2024-2044; RDTR Mranggen bila geoportal Pemkab bisa diakses |
 
 Dashboard punya kartu **Perbandingan wilayah pesisir** (luas yang turun minimal 4 cm/tahun, kelurahan berkategori tinggi, kelurahan tercepat, gerbang mutu), dibaca dari `public/data/ringkasan-wilayah.json` yang ditulis `node scripts/ringkasan-wilayah.mjs`.
 
-Temuan utama: Semarang 60 km² turun minimal 4 cm/tahun (tercepat Kelurahan Penggaron Lor 11,6 cm/tahun). Jakarta jauh lebih pelan dibanding angka 1982-2010: hanya 1,2 km² turun minimal 4 cm/tahun, terpusat di pesisir Muara Angke (sekitar 5 cm/tahun) dan Muara Baru (3 sampai 5 cm/tahun); rata-rata semua kelurahan di bawah 2 cm/tahun.
+Temuan utama: Semarang 60 km² turun minimal 4 cm/tahun (tercepat Kelurahan Penggaron Lor 11,6 cm/tahun). Jakarta jauh lebih pelan dibanding angka 1982-2010: hanya 1,2 km² turun minimal 4 cm/tahun, terpusat di pesisir Muara Angke (sekitar 5 cm/tahun) dan Muara Baru (3 sampai 5 cm/tahun); rata-rata semua kelurahan di bawah 2 cm/tahun. Demak 148 km² turun minimal 4 cm/tahun, tercepat di Mranggen yang berbatasan dengan Semarang timur (Desa Jamus 10,4 cm/tahun) dan pesisir Sayung (Jetaksari 10,0 cm/tahun). Hanya 25% wilayah Demak terukur karena sawah dan tambak kehilangan koherensi; di sana laporan menulis data tidak memadai.
 
 ## Menjalankan
 
@@ -163,14 +163,14 @@ Satu file GeoJSON `FeatureCollection` dengan anggota `metadata`. Satu fitur = sa
 | Lapis | Sumber saat ini | Catatan |
 |---|---|---|
 | Zona RDTR (Pekalongan) | Peta Rencana Pola Ruang RDTR Kota Pekalongan 2024-2044, WFS geoportal Pemkot (`palapa:POLARUANG_AR_5K`) | Skala 1:5.000, 33 sub-zona dikelompokkan ke 18 zona. Badan Jalan tidak ditampilkan. Nomor Perwal belum tercantum di metadata |
-| Zona RDTR (Demak) | RDTR Kawasan Mranggen, WFS geoportal Pemkab Demak | Hanya Mranggen. GeoServer Pemkab sedang 503 pada 15 November 2026; `07_konteks.py` melewatinya bila layanan menolak. RDTR pesisir Sayung belum ada di geoportal itu |
+| Zona RDTR (Demak) | RDTR Kawasan Mranggen, WFS geoportal Pemkab Demak | Hanya Mranggen. GeoServer Pemkab masih 503 pada 15 dan 26 November 2026; `07_konteks.py` melewatinya bila layanan menolak. RDTR pesisir Sayung belum ada di geoportal itu |
 | Pola ruang RTRW (Semarang) | Pola Ruang skala 1:25.000, Dinas Penataan Ruang Kota Semarang, WFS geoportal Pemkot (`palapa:POLARUANG_AR_25K`) | 39 sub-zona dikelompokkan ke 17 zona. RDTR Kota Semarang belum tersedia terbuka (dicek 15 November 2026) |
 | Pola ruang RTRW (Demak) | RTRW Provinsi Jawa Tengah 2024-2044 (Perda Nomor 8 Tahun 2024), dari layanan ArcGIS publik | Skala provinsi 1:250.000 |
 | Pola ruang RTRW (Pekalongan, Jakarta) | Belum ada | Pekalongan: layanan provinsi hanya memuat Kendal, Semarang, Demak, dan Jepara. Jakarta memakai RDTR |
 | Persil (bidang tanah) | BHUMI ATR/BPN (bhumi.atrbpn.go.id/peta), ditautkan dari laporan bersama koordinat titik | BHUMI tidak menyediakan layanan peta terbuka untuk aplikasi lain dan dilindungi firewall serta reCAPTCHA, jadi batas persil tidak ditampilkan langsung (dicek 15 November 2026) |
 | Zona RDTR (Jakarta) | RDTR DKI Jakarta 2022 (Pergub Nomor 31 Tahun 2022), layanan peta publik DPMPTSP DKI | Rinci sampai blok. Badan Jalan tidak ditampilkan; celah jalan antarblok ditutup supaya peta ringan |
 | Geologi (Semarang) | Peta Geologi Lembar Magelang dan Semarang 1:100.000 (Thanden dkk. 1996), didigitasi dengan `pipeline/07a_digitasi_geologi.py` | 7 satuan. Batas Aluvium cocok 87% dengan kaki bukit pada DEM tanpa digeser |
-| Bahaya banjir, gelombang ekstrem, dan abrasi (semua wilayah) | InaRISK BNPB, ArcGIS ImageServer `INDEKS_BAHAYA_BANJIR` dan `layer_bahaya_gelombang_ekstrim_dan_abrasi` di gis.bnpb.go.id, diambil dengan `pipeline/07c_bahaya.py` | Grid asli 100 m tanpa resampling, dibagi ke kelas BNPB (rendah sampai 0,333, sedang sampai 0,666, tinggi). Lisensi pemakaian ulang tidak dicantumkan; ditampilkan dengan atribusi. Demak menyusul setelah grid lajunya jadi |
+| Bahaya banjir, gelombang ekstrem, dan abrasi (semua wilayah) | InaRISK BNPB, ArcGIS ImageServer `INDEKS_BAHAYA_BANJIR` dan `layer_bahaya_gelombang_ekstrim_dan_abrasi` di gis.bnpb.go.id, diambil dengan `pipeline/07c_bahaya.py` | Grid asli 100 m tanpa resampling, dibagi ke kelas BNPB (rendah sampai 0,333, sedang sampai 0,666, tinggi). Lisensi pemakaian ulang tidak dicantumkan; ditampilkan dengan atribusi |
 | Geologi (Jakarta, Pekalongan, Demak) | Lembar Jakarta dan Kepulauan Seribu (Turkandi dkk. 1992), Banjarnegara dan Pekalongan (Condon dkk. 1996), Kudus (Suwarti dan Wikarno 1992), dan Salatiga (Sukardi dan Budhitrisna 1992); didigitasi dengan `pipeline/07b_geologi_lembar.py` | Warna satuan diambil dari kotak legenda lembar itu sendiri. Ketelitian batas sekitar 100 sampai 200 m |
 
 Hasil analisis: median laju di Aluvium 3,6 cm/tahun dan 48% pikselnya turun minimal 4 cm/tahun. Di keenam satuan batuan lain (Formasi Damar, Kaligetas, Kerek, Kalibeng, Jongkong, dan batuan gunungapi Gajahmungkur) median sekitar 0 dan tidak ada piksel yang turun secepat itu. Di dalam Aluvium pun ambles cepat terpusat di bagian utara dan timur; Aluvium di barat relatif stabil.

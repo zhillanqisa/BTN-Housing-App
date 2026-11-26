@@ -1,5 +1,5 @@
 {
- "dibuat": "2026-11-15",
+ "dibuat": "2026-11-25",
  "ambangCm": [
   2,
   4
@@ -133,7 +133,45 @@
   },
   {
    "id": "demak",
-   "status": "belum"
+   "status": "olahan",
+   "nama": "Kabupaten Demak",
+   "periode": [
+    "2020-01",
+    "2026-11"
+   ],
+   "lulusGerbang": true,
+   "nKelurahan": 249,
+   "nKelurahanMemadai": 131,
+   "nKelurahanTinggi": 78,
+   "tercepat": [
+    {
+     "nama": "Jamus",
+     "kecamatan": "Mranggen",
+     "laju": 10.4
+    },
+    {
+     "nama": "Wringin Jajar",
+     "kecamatan": "Mranggen",
+     "laju": 10.1
+    },
+    {
+     "nama": "Jetaksari",
+     "kecamatan": "Sayung",
+     "laju": 10
+    }
+   ],
+   "piksel": {
+    "dalamWilayah": 158170,
+    "terukur": 39485,
+    "persenTerukur": 25,
+    "median": 4.63,
+    "p95": 9.8,
+    "maks": 12,
+    "luasKm2": {
+     "min2": 209.8,
+     "min4": 147.9
+    }
+   }
   }
  ]
 }
